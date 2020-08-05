@@ -8,6 +8,10 @@ import simplejson, urllib
 import json
 import re
 from time import sleep
+import pexpect
+import logging
+
+
 
 
 os.environ["PATH"] += os.pathsep + '/usr/local/bin'
@@ -28,6 +32,8 @@ class c:
     MAGENTA = '\033[35m'
     ENDC = '\033[0m'
     GREY = '\033[1m'
+    UNDERLINE = '\033[4m'
+    
     
 fullPathFileName = os.path.realpath(__file__)
 
@@ -197,6 +203,177 @@ json_formatted_str = json.dumps(parsed, indent=2, sort_keys=True)
 for line in json_formatted_str.splitlines():
     print("-- " + '‎‎' + line + "| color=white size=11 font='Courier New'")
 
+print "---"
 print "🔄 Refresh | refresh=true"
 
+
+
+
+#-----------------------------------------------------------------------------------------------------------
+# Custom Formatter  
+#-----------------------------------------------------------------------------------------------------------
+class MyFormatter(logging.Formatter):
+
+    err_fmt  = c.RED   + '%(filename)s:%(lineno)s - %(asctime)s - %(levelname)s: %(msg)s' + c.ENDC
+    dbg_fmt  = c.BLUE  + '%(filename)s:%(lineno)s - %(asctime)s - %(levelname)s: %(msg)s' + c.ENDC
+    info_fmt = c.WHITE + '%(filename)s:%(lineno)s - %(asctime)s - %(levelname)s: %(msg)s' + c.ENDC
+    no_fmt  =  '%(msg)s'
+
+    def __init__(self, fmt="%(levelno)s: %(msg)s"):
+        logging.Formatter.__init__(self, fmt)
+
+
+    def format(self, record):
+
+        # Save the original format configured by the user
+        # when the logger formatter was instantiated
+        format_orig = self._fmt
+
+        # Replace the original format with one customized by logging level
+        if record.levelno == logging.DEBUG:
+            self._fmt = MyFormatter.dbg_fmt
+
+        elif record.levelno == logging.INFO:
+            self._fmt = MyFormatter.info_fmt
+
+        elif record.levelno == logging.ERROR:
+            self._fmt = MyFormatter.err_fmt
+        
+        # I'm using this for lines with no preamble
+        elif record.levelno == logging.NONE:    
+            self._fmt = MyFormatter.no_fmt
+            
+
+        # Call the original formatter class to do the grunt work
+        result = logging.Formatter.format(self, record)
+
+        # Restore the original format configured by the user
+        self._fmt = format_orig
+
+        return result
+
+def addLoggingLevel(levelName, levelNum, methodName=None):
+    if not methodName:
+        methodName = levelName.lower()
+
+    if hasattr(logging, levelName):
+        raise AttributeError('{} already defined in logging module'.format(levelName))
+    if hasattr(logging, methodName):
+        raise AttributeError('{} already defined in logging module'.format(methodName))
+    if hasattr(logging.getLoggerClass(), methodName):
+        raise AttributeError('{} already defined in logger class'.format(methodName))
+
+    def logForLevel(self, message, *args, **kwargs):
+        if self.isEnabledFor(levelNum):
+            self._log(levelNum, message, args, **kwargs)
+
+    def logToRoot(message, *args, **kwargs):
+        logging.log(levelNum, message, *args, **kwargs)
+
+    logging.addLevelName(levelNum, levelName)
+    setattr(logging, levelName, levelNum)
+    setattr(logging.getLoggerClass(), methodName, logForLevel)
+    setattr(logging, methodName, logToRoot)
+
+#-----------------------------------------------------------------------------------------------------------
+# This is the method called by the pexpect object to log
+#-----------------------------------------------------------------------------------------------------------
+def _write(*args, **kwargs):
+    content = args[0]
+    # Ignore other params, pexpect only use one arg
+    if content in [' ', '', '\n', '\r', '\r\n']:
+        return # don't log empty lines
+    for eol in ['\r\n', '\r', '\n']:
+        # remove ending EOL, the logger will add it anyway
+        content = re.sub('\%s$' % eol, '', content)
+    return logger.info(content) # call the logger info method with the reworked content
+
+#-----------------------------------------------------------------------------------------------------------
+# My flush method
+#-----------------------------------------------------------------------------------------------------------
+def _doNothing():
+    pass
+
+
+
+#-----------------------------------------------------------------------------------------------------------
+# Setup the logger facility
+#-----------------------------------------------------------------------------------------------------------
+addLoggingLevel('NONE', '1000')
+logging.getLogger(__name__).setLevel("NONE")
+logger = logging.getLogger(__name__)
+logger.write = _write
+logger.flush = _doNothing
+fmt = MyFormatter()
+hdlr = logging.StreamHandler(sys.stdout)
+hdlr.setFormatter(fmt)
+logger.addHandler(hdlr)
+logger.setLevel(logging.DEBUG)
+
+USERNAME = 'root'
+PASSWD = 'xxx'
+SSH_CMD = 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {}'.format(USERNAME)
+ip='192.168.86.98'
+LOCAL_PROMPT = '.*[#\$]'
+
+
+
+# SSH to device
+command = SSH_CMD+'@{}'.format(ip)
+logger.info('SSH to device.')
+logger.info('SSH command is: ' + c.CYAN + c.UNDERLINE + '{}'.format(command) + c.ENDC)
+child = pexpect.spawn (command)
+child.logfile_read = logger
+child.logfile_send = logger  #Set to None to hide password
+
+i = child.expect([pexpect.TIMEOUT, '.*assword:', '.*refused', pexpect.EOF])
+logger.debug('i is: {}'.format(i))
+if i != 1:
+    die(child, 'ERROR! SSH Failed:', ip)
+    exit(0)
+child.delaybeforesend = 1
+child.sendline(PASSWD)
+child.sendline('')
+
+i = child.expect([pexpect.TIMEOUT, 'Permission denied', 'closed by remote host', '{}'.format(LOCAL_PROMPT), pexpect.EOF])
+logger.debug('i is: {}'.format(i))
+if i == 0:
+    die(child, 'ERROR! SSH timed out:', ip)
+    exit(0)
+elif i == 1:
+    die(child, 'ERROR! Incorrect password:', ip)
+    exit(0)
+elif i == 2:
+    die(child, 'ERROR! Connection Closed:', ip)
+    exit(0)
+result = child.before.decode('utf-8', 'ignore')
+logger.info(result)
+
+#remote cmds
+logger.info('Run docker ps -a.')
+logger.info('Command is: ' + c.CYAN + c.UNDERLINE + '{}'.format('docker ps -a') + c.ENDC)
+#To disable double prints
+child.logfile_send = None                   
+
+child.sendline('docker ps -a')
+
+retry = 2
+while retry > 0:
+    retry -= 1
+    i = child.expect ([pexpect.TIMEOUT, pexpect.EOF], timeout=2)
+    logger.debug('i is: {}'.format(i))
+    if i==0:
+        logger.debug('result=%s' % (child.before))
+        if 'IMAGE' in child.before:
+            logger.info(c.GREEN + 'docker ps -a completed successfully.' + c.ENDC)
+            break
+        if child.before:
+            logger.info(c.GREEN + 'Expecting prompt.' + c.END)
+            child.expect (LOCAL_PROMPT)
+    else:
+        break
+
+if retry == 0:
+    die(child, 'ERROR! Something went wrong:', ip)  
+    exit(0)
 
