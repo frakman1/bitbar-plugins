@@ -4,7 +4,7 @@
 import os, sys
 import argparse
 import subprocess
-import simplejson, urllib
+#import simplejson, urllib
 import json
 import re
 from time import sleep
@@ -26,7 +26,9 @@ passwd_path = dockerinfodata_path+'/'+"passwd.txt"
 
 os.environ["PATH"] += os.pathsep + '/usr/local/bin'
 DOCKER_PATH = 'docker'
-DOCKERPS_CMD = DOCKER_PATH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}'"
+DOCKERPS_QUICK = DOCKER_PATH + " ps -a --format '{{.ID}}'"
+DOCKERPS_CMD_LOCAL = DOCKER_PATH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}^^{{.Size}}'"
+DOCKERPS_CMD_REMOTE = DOCKER_PATH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}'"
 DOCKERIMAGES_CMD = DOCKER_PATH + ' images --format "{{.Repository}}^^{{.Tag}}^^{{.ID}}^^{{.CreatedSince}}^^{{.Size}}"'
 REMOTE_DAEMON_PATH = '/etc/docker/daemon.json'
 LOCAL_DAEMON_PATH = os.path.join(os.path.expanduser("~"),'.docker/daemon.json')
@@ -81,28 +83,44 @@ if os.path.isfile(passwd_path) :
     with open(passwd_path, 'r') as file:
         passwd = file.read()
 
+def display(msg):
+    #if isinstance(msg, list):
+        #msg = '\n'.join(msg)
+
+    #sys.stdout.write(str(msg)+'\n')
+    #sys.stdout.write('\n~~~\n')
+    print(msg)
+    sys.stdout.flush()
+
 def run_remote_cmd(script, sess):
+    #print 'sess:',sess
     sess.expect (r'.+')  # This clears it from previous command output
     sess.logfile_send = None
     sess.sendline(script)
-    retry = 2
+    retry = 20
     while retry > 0:
         retry -= 1
         i = sess.expect ([pexpect.TIMEOUT, pexpect.EOF], timeout=2)
-        #logger.debug('i is: {}'.format(i))
+        #i = sess.expect ([LOCAL_PROMPT,pexpect.TIMEOUT, pexpect.EOF], timeout=60)
+        #print('retry:{} script i is: {}'.format(retry,i))
+        #print('before:{}'.format(sess.before))
+        #print('after:{}'.format(sess.after))
         if i==0:
-            #logger.debug('result=%s' % (child.before))
-            if '' in sess.before:
-                #logger.info(c.GREEN + 'docker ps -a completed successfully.' + c.ENDC)
+            #print('result=%s' % (sess.before))
+            if re.search(LOCAL_PROMPT, sess.before): #check for success string
+                #print(c.GREEN + 'Data is in Before.' + c.ENDC)
                 return sess.before
             if sess.before:
-                #logger.info(c.GREEN + 'Expecting prompt.' + c.END)
-                sess.expect (LOCAL_PROMPT)
+                #return sess.after
+                #print(c.GREEN + 'Data is in After.' + c.END)
+                #print'in sess.before'
+                #sess.expect (r'.+')
+                continue
         else:
             break
 
     if retry == 0:
-        die(sess, 'ERROR! Something went wrong')  
+        print('ERROR! Something went wrong')   
 
 def run_script(script):
     return (subprocess.Popen([script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()[0].strip())
@@ -128,38 +146,50 @@ def escape_ansi(line):
 def print_containers(input_string, local=True, size=8, sess=None):
     global dockerps_images
     if local:
-        print c.WHITE,'{}'.format('    📦 Local Containers ({})'.format(c.GREEN + run_script(DOCKERPS_CMD + ' | wc -l')+c.ENDC)),c.ENDC
+        print c.WHITE,'{}'.format('    📦 Containers ({})'.format(c.GREEN + run_script(DOCKERPS_QUICK + ' | wc -l')+c.ENDC)),c.ENDC
+        print '--',c.WHITE,'{:^13s}'.format('CONTAINER ID'),'{:<25s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:<21s}'.format('    NAME'),'{:<20s}'.format('     SIZE'),c.ENDC," | size={} font='Courier New'".format(size)
     else:
-        cmd_output = run_remote_cmd(DOCKERPS_CMD + ' | wc -l', child)
+        cmd_output = run_remote_cmd(DOCKERPS_QUICK + ' | wc -l', child)
         for line in cmd_output.splitlines():
             if (re.search(r'\d{2,}', line)) != None:
                 num = re.search(r'\d{2,}', line).group()
                 break
-        print c.WHITE,'{}'.format('    📦 Remote Containers ({})'.format(c.GREEN +num+c.ENDC)),c.ENDC
-    print '--',c.WHITE,'{:^13s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:<20s}'.format('    NAME'),c.ENDC," | size={} font='Courier New'".format(size)
+        print c.WHITE,'{}'.format('    📦 Containers ({})'.format(c.GREEN +num+c.ENDC)),c.ENDC
+        print '--',c.WHITE,'{:^13s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:<20s}'.format('    NAME'),c.ENDC," | size={} font='Courier New'".format(size)
+        
     for line in input_string.splitlines():
         if '--format' in line or '{{' in line :
             continue
         split_line = line.split("^^")
         if len(split_line) < 5:
             continue
-        print '--',c.BLUE,'{:<13s}'.format(split_line[0]),c.YELLOW,'{:<31s}'.format(split_line[1]),c.RED,'{:<22s}'.format(split_line[2]),c.MAGENTA,'{:<28s}'.format(split_line[3]),c.GREEN,'{:<20s}'.format(split_line[4]),c.ENDC," | size={} font='Courier New'".format(size)
-        
         if local:
+            string = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<25s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<21s}'.format(split_line[4])+c.CYAN+'{:<20s}'.format(split_line[5])+c.ENDC+" | size={} font='Courier New'".format(size)
+            display(string)
+            #print '--',c.BLUE,'{:<13s}'.format(split_line[0]),c.YELLOW,'{:<25s}'.format(split_line[1]),c.RED,'{:<22s}'.format(split_line[2]),c.MAGENTA,'{:<28s}'.format(split_line[3]),c.GREEN,'{:<21s}'.format(split_line[4]),c.CYAN,'{:<20s}'.format(split_line[5]),c.ENDC," | size={} font='Courier New'".format(size)
             get_img_id = DOCKER_PATH + " inspect --format='{{.Image}}' " + split_line[0]
             output = run_script(get_img_id)
             tmp = output[output.index(':')+1:]
             image_id = tmp[0:12]
             dockerps_images.append(image_id)
-        
-        inspect_cmd = DOCKER_PATH + " inspect " + split_line[0]
+        else:
+            string = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<20s}'.format(split_line[4])+c.ENDC+" | size={} font='Courier New'".format(size)
+            display(string)
+            #print '--',c.BLUE,'{:<13s}'.format(split_line[0]),c.YELLOW,'{:<31s}'.format(split_line[1]),c.RED,'{:<22s}'.format(split_line[2]),c.MAGENTA,'{:<28s}'.format(split_line[3]),c.GREEN,'{:<20s}'.format(split_line[4]),c.ENDC," | size={} font='Courier New'".format(size)
+            
+        inspect_cmd = DOCKER_PATH + " inspect 2> /dev/null" + split_line[0]
         if local:
             inspect_output = run_script(inspect_cmd)
         else:
             inspect_output = run_remote_cmd(inspect_cmd, sess)
+           
         print "---- 🔬 Inspect"
+         
         for inspect_line in inspect_output.splitlines():
-            print "------ "  + '‎‎' + inspect_line + " |  color=white size=11 font='Courier New'"
+            #inspect_clean = escape_ansi(inspect_line) 
+            string = "------ "  + '‎‎' + inspect_line.strip()+ " |  color=white size=11 font='Courier New'"
+            display(string)
+            #print "------ "  + '‎‎' + inspect_line+ " |  color=white size=11 font='Courier New'"+c.ENDC
             
         log_cmd = DOCKER_PATH + " logs -t --tail 20 " + split_line[0].strip() +" 2> /dev/null"
         if local:
@@ -168,35 +198,41 @@ def print_containers(input_string, local=True, size=8, sess=None):
             log_output = run_remote_cmd(log_cmd, sess)
         
         #print "---- 🪵 Log"
-        print "---- Log | image={}".format(log_icon2).strip()
+        print "---- 📔 Log"
+        #print "---- Log | image={}".format(log_icon2).strip()
         for log_line in log_output.splitlines():
             log_clean = escape_ansi(log_line) 
-            print "------ " , log_clean, "| color=white size=11 font='Courier New'",c.ENDC
+            #string = "------ " , log_clean.strip(), "| color=white size=11 font='Courier New'",c.ENDC
+            string = "------ "  +log_clean.strip()+ " |  color=white size=11 font='Courier New'"
+            display(string)
+            #print "------ " , log_clean.strip(), "| color=white size=11 font='Courier New'",c.ENDC
 
         if local:
             if 'Up' in split_line[3]:
-                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-s param2={} terminal=false refresh=true".format(split_line[0]),c.ENDC
-                print "---- ↩️ Enter | none",c.ENDC
-                print "------ bash | image={} bash=".format(shell_icon) + ME_PATH +  " param1=-b1 param2={} terminal=true refresh=true".format(split_line[0]),c.ENDC
-                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-b2 param2={} terminal=true refresh=true".format(split_line[0]),c.ENDC
-                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} terminal=false refresh=true".format(split_line[0]),c.ENDC
+                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-s param2={} terminal=false refresh=true".format(split_line[0])
+                print "---- ↩️ Enter | none"+c.ENDC
+#                print "------ bash | image={} bash=".format(shell_icon) + ME_PATH +  " param1=-b1 param2={} terminal=true refresh=true".format(split_line[0]),c.ENDC
+                print "------ #️⃣ bash | image={} bash=".format(shell_icon) + ME_PATH +  " param1=-b1 param2={} terminal=true refresh=true".format(split_line[0])
+                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-b2 param2={} terminal=true refresh=true".format(split_line[0])
+                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} terminal=false refresh=true".format(split_line[0])
         
             if 'Exited' in split_line[3] or 'Created' in split_line[3]:
-                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-t param2={} terminal=false refresh=true".format(split_line[0]),c.ENDC
-                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-r param2={} terminal=false refresh=true".format(split_line[0]),c.ENDC
+                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-t param2={} terminal=false refresh=true".format(split_line[0])
+                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-r param2={} terminal=false refresh=true".format(split_line[0])
           
 def print_images(input_string, local=True, size=8):
     global dockerps_images
     
     if local:
-        print c.WHITE,'{}'.format('    🖼️ Local Images ({})'.format(c.GREEN + run_script(DOCKERIMAGES_CMD + ' | wc -l')+c.ENDC)),c.ENDC
+        print c.WHITE,'{}'.format('    🖼️ Images ({})'.format(c.GREEN + run_script(DOCKERIMAGES_CMD + ' | wc -l')+c.ENDC)),c.ENDC
     else:
+        num=''
         cmd_output = run_remote_cmd(DOCKERIMAGES_CMD + ' | wc -l', child)
         for line in cmd_output.splitlines():
             if (re.search(r'\d{2,}', line)) != None:
                 num = re.search(r'\d{2,}', line).group()
                 break
-        print c.WHITE,'{}'.format('    📦 Remote Images ({})'.format(c.GREEN +num+c.ENDC)),c.ENDC
+        print c.WHITE,'{}'.format('    🖼️ Images ({})'.format(c.GREEN +num+c.ENDC)),c.ENDC
     print '-- ',c.WHITE,'{:<45s}'.format('REPOSITORY'),c.WHITE,'{:<15s}'.format('TAG'),c.WHITE,'{:<15s}'.format('ID'),c.WHITE,'{:<15s}'.format('CREATED'),c.WHITE,'{:<10s}'.format('SIZE'),c.ENDC," | size={} font='Courier New'".format(size)
     for line in input_string.splitlines():
         if '--format' in line or '{{' in line :
@@ -204,7 +240,9 @@ def print_images(input_string, local=True, size=8):
         split_line = line.split("^^")
         if len(split_line) < 5:
             continue
-        print '-- ',c.BLUE,'{:<45s}'.format(split_line[0]),c.RED,'{:<15s}'.format(split_line[1]),c.YELLOW,'{:<15s}'.format(split_line[2]),c.MAGENTA,'{:<15s}'.format(split_line[3]),c.GREEN,'{:<10s}'.format(split_line[4]),c.ENDC," | size={} font='Courier New'".format(size)
+        string = '-- '+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:<10s}'.format(split_line[4])+c.ENDC+" | size={} font='Courier New'".format(size)
+        display(string)
+        #print '-- ',c.BLUE,'{:<45s}'.format(split_line[0]),c.RED,'{:<15s}'.format(split_line[1]),c.YELLOW,'{:<15s}'.format(split_line[2]),c.MAGENTA,'{:<15s}'.format(split_line[3]),c.GREEN,'{:<10s}'.format(split_line[4]),c.ENDC," | size={} font='Courier New'".format(size)
         if local:
             if split_line[2] not in dockerps_images:
                 print "---- 🗑️ Remove | bash=" + ME_PATH +  " param1=-rmi param2={} terminal=false refresh=true".format(split_line[2])
@@ -212,27 +250,35 @@ def print_images(input_string, local=True, size=8):
                 print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmif param2={} terminal=false refresh=true".format(split_line[2])
     
 def print_info(input_string, local=True, size=11):
-    if local:
-        print c.WHITE,'{}'.format('    ℹ️ Local Docker Info'),c.ENDC
-    else:
-        print c.WHITE,'{}'.format('    ℹ️ Remote Docker Info'),c.ENDC
+    print c.WHITE,'{}'.format('    ℹ️ Docker Info'),c.ENDC
+
     for info_line in input_string.splitlines():
-        print "-- "  + '‎‎' + info_line + " |  color=white size=11 font='Courier New'"
+        string = "-- "  + '‎‎' + info_line + " |  color=white size=11 font='Courier New'"+c.ENDC
+        display(string)
+        #print "-- "  + '‎‎' + info_line + " |  color=white size=11 font='Courier New'"+c.ENDC
 
 def print_daemon(input_string, local=True, size=11):
     if local:
-        print c.WHITE,'{}'.format('    ⚙️ Local daemon.json'),c.ENDC
+        print c.WHITE,'{}'.format('    ⚙️ daemon.json'),c.ENDC
         parsed = json.loads(daemoninfo)
         json_formatted_str = json.dumps(parsed, indent=2, sort_keys=True)
         #json_formatted_str = yaml.safe_dump(parsed, allow_unicode=True, default_flow_style=False)   #Use this line if you prefer yaml display
         for line in json_formatted_str.splitlines():
-            print("-- " + '‎‎' + line + "| color=white size=11 font='Courier New'")
+            string = "-- " + '‎‎' + line + "| color=white size=11 font='Courier New'"+c.ENDC
+            display(string)
+            #print("-- " + '‎‎' + line + "| color=white size=11 font='Courier New'")+c.ENDC
     else:
-        print c.WHITE,'{}'.format('    ⚙️ Remote daemon.json'),c.ENDC
+        print c.WHITE,'{}'.format('    ⚙️ daemon.json'),c.ENDC
         #if ('No such file or directory' in input_string):
             #print '-- N/A'    
         for line in input_string.splitlines():
-            print "-- "  + '‎‎' + line + " |  color=white size=11 font='Courier New'"
+            string = "-- "  + '‎‎' + line + " |  color=white size=11 font='Courier New'"+c.ENDC
+            display(string)
+            #print "-- "  + '‎‎' + line + " |  color=white size=11 font='Courier New'"+c.ENDC
+
+#def print_size(input_string, local=True, size=8):
+    
+
 
 def print_refresh():
     print "---"
@@ -344,16 +390,19 @@ if(len(sys.argv) >= 2):
 
 #print '🐳'
 #print '| image={}'.format(moby_icon)
+
 print '| image={}'.format(moby_icon2)
 print '---'
+
+
 if local_enabled:
     print "🏠 Local Docker |  color=#30C102 bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true" 
     print '---'
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Docker Containers
     #-----------------------------------------------------------------------------------------------------------
-    cmd_output=run_script(DOCKERPS_CMD)
-    print_containers(cmd_output, local=True, size=10)  
+    cmd_output=run_script(DOCKERPS_CMD_LOCAL)
+    print_containers(cmd_output, local=True, size=8)  
 
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Docker Images
@@ -376,6 +425,21 @@ if local_enabled:
             daemoninfo = file.read()
     print_daemon(daemoninfo, local=True, size=10)
     
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Sizes
+    #-----------------------------------------------------------------------------------------------------------
+    print c.WHITE,'{}'.format('    📏 Sizes'),c.ENDC
+    dockerdf_output=run_script(DOCKER_PATH + ' system df -v')
+    for line in dockerdf_output.splitlines():
+        if  'space usage:' in line:
+            print("-- " + '‎‎' + line + "| color=#30C102 size=8 font='Courier New'")
+        elif  'SIZE' in line:
+            print("-- " + '‎‎' + line + "| color=yellow size=8 font='Courier New'")
+            
+        else:
+            print("-- " + '‎‎' + line + "| color=white size=8 font='Courier New'")
+        
+    
 else:
     print "🏠 Local Docker | color=gray bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true"
 print '---'
@@ -383,7 +447,10 @@ print '---'
 #-----------------------------------------------------------------------------------------------------------
 # 
 #-----------------------------------------------------------------------------------------------------------
-
+#print '| image={}'.format(moby_icon2)
+#sys.stdout.write(str('Loading Remote 1')) 
+#sys.stdout.write('\n~~~\n')
+    
 #-----------------------------------------------------------------------------------------------------------
 # Remote Docker Check/Config
 #-----------------------------------------------------------------------------------------------------------
@@ -430,7 +497,7 @@ child.sendline(passwd)
 child.sendline('')
 
 i = child.expect([pexpect.TIMEOUT, 'Permission denied', 'closed by remote host', '{}'.format(LOCAL_PROMPT), pexpect.EOF])
-#logger.debug('i is: {}'.format(i))
+#print('ssh i is: {}'.format(i))
 if i == 0:
     #die(child, 'ERROR! SSH timed out:', ip)
     exit(0)
@@ -442,25 +509,32 @@ elif i == 2:
     exit(0)
 result = child.before.decode('utf-8', 'ignore')
 #logger.info(result)
-
+#print child
 print "---"
+
 #-----------------------------------------------------------------------------------------------------------
 # Get Remote Docker Containers
 #-----------------------------------------------------------------------------------------------------------
-cmd_output = run_remote_cmd(DOCKERPS_CMD, child)
+cmd_output = run_remote_cmd(DOCKERPS_CMD_REMOTE, child)
 print_containers(cmd_output, local=False, size=10, sess=child)  
+#sys.stdout.write(str('Loading Remote 2')) 
+#sys.stdout.write('\n~~~\n')
 
 #-----------------------------------------------------------------------------------------------------------
 # Get Remote Docker Images
 #-----------------------------------------------------------------------------------------------------------
 cmd_output = run_remote_cmd(DOCKERIMAGES_CMD, child)
 print_images(cmd_output, local=False, size=10)
+#sys.stdout.write(str('Loading Remote 3')) 
+#sys.stdout.write('\n~~~\n')
 
 #-----------------------------------------------------------------------------------------------------------
 # Get Remote Docker Info
 #-----------------------------------------------------------------------------------------------------------
 daemon_output=run_remote_cmd(DOCKER_PATH + ' info' , child)
 print_info(daemon_output, local=False, size=11)
+#sys.stdout.write(str('Loading Remote 4')) 
+#sys.stdout.write('\n~~~\n')
 
 #-----------------------------------------------------------------------------------------------------------
 # Get Remote Docker Daemon (if any)
@@ -468,6 +542,27 @@ print_info(daemon_output, local=False, size=11)
 daemoninfo = ''
 daemon_output=run_remote_cmd('cat '+REMOTE_DAEMON_PATH, child)
 print_daemon(daemon_output, local=False)
+#sys.stdout.write(str('Loading Remote 5')) 
+#sys.stdout.write('\n~~~\n')
+
+#-----------------------------------------------------------------------------------------------------------
+# Get Sizes
+#-----------------------------------------------------------------------------------------------------------
+print c.WHITE,'{}'.format('    📏 Sizes'),c.ENDC
+dockerdf_output=run_remote_cmd(DOCKER_PATH + ' system df -v', child)
+#dockerdf_output=run_remote_cmd(DOCKER_PATH + ' ps -a', child)
+if dockerdf_output:
+    for line in dockerdf_output.splitlines():
+        if  'space usage:' in line:
+            print("-- " + '‎‎' + line + "| color=#30C102 size=8 font='Courier New'")
+        elif  'SIZE' in line:
+            print("-- " + '‎‎' + line + "| color=yellow size=8 font='Courier New'")
+        
+        else:
+            print("-- " + '‎‎' + line + "| color=white size=8 font='Courier New'")
+
+#print '| image={}'.format(moby_icon2)
+#sys.stdout.write('\n~~~\n')
 
 child.close()
 print_refresh()
