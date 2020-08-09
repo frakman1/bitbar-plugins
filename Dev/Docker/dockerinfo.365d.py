@@ -172,6 +172,7 @@ def run_script(script):
 @timing_decorator
 def print_containers(input_mystring, local=True, size=8, sess=None, ssh='password'):
     global dockerps_images
+    del dockerps_images[:]
     if local:
         print c.WHITE,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK + ' | wc -l | xargs') + ']' + c.END)),c.END
         print '--',c.WHITE,'{:<13s}'.format('CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:<20s}'.format('SIZE'),c.END," | size={} font='Courier New'".format(size)
@@ -223,8 +224,8 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         #print 'inspect_output:',inspect_output;exit(0) 
         #exit(0)   
         print "---- 🔬 Inspect"
-         
-        for inspect_line in inspect_output.splitlines():
+        ''' 
+        for inspect_line in inspect_output.split("\n"):
             #inspect_clean = escape_ansi(inspect_line) 
             #mystring = "------ "  + '‎‎' + repr(inspect_line) + " |  color=white size=11 font='Courier New'"
             #tmp = '‎‎' + repr(inspect_line)[1:-1]
@@ -232,6 +233,13 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             mystring = "------ "  + '‎‎' +  tmp + " | color=white size=11 font='Courier New'"
             display(mystring)
             #print "------ "  + '‎‎' + inspect_line+ " |  color=white size=11 font='Courier New'"+c.END
+        '''
+        parsed = json.loads(inspect_output)
+        json_formatted_str = json.dumps(parsed, indent=2, sort_keys=True)
+        #json_formatted_str = yaml.safe_dump(parsed, allow_unicode=True, default_flow_style=False)   #Use this line if you prefer yaml display
+        for line in json_formatted_str.splitlines():
+            mystring = "------ " + '‎‎' + repr(line) + "| color=white size=11 font='Courier New'"+c.END
+            display(mystring)
          
             
         if local or ssh=='passwordless':
@@ -696,13 +704,13 @@ elif ssh_method=='passwordless':
     print_images(cmd_output, local=False, size=10, ssh=ssh_method)
 
     #-----------------------------------------------------------------------------------------------------------
-    # Get Local Docker Info
+    # Get Remote Docker Info (but use the local processing)
     #-----------------------------------------------------------------------------------------------------------
     dockerinfo_output=run_script(DOCKER_PATH + ssh_addon + ' info')
     print_info(dockerinfo_output, local=True, size=10)
     
     #-----------------------------------------------------------------------------------------------------------
-    # Get Local Docker Daemon (if any)
+    # Get Remote Docker Daemon (if any, and use local processing)
     #-----------------------------------------------------------------------------------------------------------
     daemoninfo = ''
     daemoninfo = run_script(sshcommand + ' "test -f ' + daemon + ' && cat ' + daemon + '"')
