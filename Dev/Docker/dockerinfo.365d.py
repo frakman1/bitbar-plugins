@@ -4,7 +4,6 @@
 import os, sys
 import argparse
 import subprocess
-#import simplejson, urllib
 import json
 import re
 from time import sleep
@@ -12,8 +11,8 @@ import pexpect
 import logging
 #import yaml
 import string
-import unicodedata
 import time
+
 ME_PATH = os.path.realpath(__file__)
 
 start = time.time()
@@ -188,8 +187,6 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         print c.WHITE+'{}'.format('    📦 Containers {}'.format(c.GREEN +str(num)+c.END))+c.END
         print '--',c.WHITE,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:<20s}'.format('    NAME'),c.END," | size={} font='Courier New'".format(size)
     for i, line in enumerate(input_mystring.splitlines()):
-        #if i==2:
-            #exit(0)
         if '--format' in line or '{{' in line :
             continue
         split_line = line.split("^^")
@@ -221,26 +218,11 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         else:
             inspect_cmd = DOCKER_PATH + " inspect " + split_line[0]#
             inspect_output = run_remote_cmd(inspect_cmd, sess)
-        #print 'inspect_output:',inspect_output;exit(0) 
-        #exit(0)   
+        #print 'inspect_output:',inspect_output
         print "---- 🔬 Inspect"
-        ''' 
-        for inspect_line in inspect_output.split("\n"):
-            #inspect_clean = escape_ansi(inspect_line) 
-            #mystring = "------ "  + '‎‎' + repr(inspect_line) + " |  color=white size=11 font='Courier New'"
-            #tmp = '‎‎' + repr(inspect_line)[1:-1]
-            tmp = repr(inspect_line)
-            mystring = "------ "  + '‎‎' +  tmp + " | color=white size=11 font='Courier New'"
+        for inspect_line in inspect_output.splitlines():
+            mystring = "------ " + repr(inspect_line) + " | color=white size=11 font='Courier New'"
             display(mystring)
-            #print "------ "  + '‎‎' + inspect_line+ " |  color=white size=11 font='Courier New'"+c.END
-        '''
-        parsed = json.loads(inspect_output)
-        json_formatted_str = json.dumps(parsed, indent=2, sort_keys=True)
-        #json_formatted_str = yaml.safe_dump(parsed, allow_unicode=True, default_flow_style=False)   #Use this line if you prefer yaml display
-        for line in json_formatted_str.splitlines():
-            mystring = "------ " + '‎‎' + repr(line) + "| color=white size=11 font='Courier New'"+c.END
-            display(mystring)
-         
             
         if local or ssh=='passwordless':
             if ssh=='passwordless': 
@@ -259,15 +241,15 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             display(mystring)
         if local or ssh=='passwordless':
             if 'Up' in split_line[3]:
-                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-s param2={} terminal=false refresh=true".format(split_line[0])
+                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-s param2={} param3={} terminal=false refresh=true".format(split_line[0],local)
                 print "---- ↩️ Enter | none"+c.END
-                print "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-b1 param2={} terminal=true refresh=true".format(split_line[0])
-                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-b2 param2={} terminal=true refresh=true".format(split_line[0])
-                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} terminal=false refresh=true".format(split_line[0])
+                print "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-b1 param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
+                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-b2 param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
+                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} param3={} terminal=false refresh=true".format(split_line[0],local)
         
             if 'Exited' in split_line[3] or 'Created' in split_line[3]:
-                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-t param2={} terminal=false refresh=true".format(split_line[0])
-                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-r param2={} terminal=false refresh=true".format(split_line[0])
+                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-t param2={} param3={} terminal=false refresh=true".format(split_line[0],local)
+                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-r param2={} param3={} terminal=false refresh=true".format(split_line[0],local)
 
 @timing_decorator          
 def print_images(input_mystring, local=True, size=8, ssh='password'):
@@ -302,52 +284,45 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
 
 @timing_decorator    
 def print_info(input_mystring, local=True, size=11):
-    print c.WHITE,'{}'.format('    ℹ️ Docker Info'),c.END
+    print '-- ',c.WHITE,'{}'.format('    ℹ️ Docker Info'),c.END
 
     for info_line in input_mystring.splitlines():
-        mystring = "-- "  + '‎‎' + info_line + " |  color=white size=11 font='Courier New'"+c.END
+        mystring = "---- "  + '‎‎' + info_line + " |  color=white size=11 font='Courier New'"+c.END
         display(mystring)
         #print "-- "  + '‎‎' + info_line + " |  color=white size=11 font='Courier New'"+c.END
 
 @timing_decorator
 def print_daemon(input_mystring, local=True, size=11):
-    if local:
-        print c.WHITE,'{}'.format('    ⚙️ daemon.json'),c.END
+    print '-- ',c.WHITE,'{}'.format('    ⚙️ daemon.json'),c.END
+    if daemon == REMOTE_DAEMON_PATH and local==False:
+        print "---- Set custom daemon.json path | color=#30C102 bash=" + ME_PATH +  " param1=-dpath param2=null terminal=false refresh=true"
+    else:
+        print "---- Set default daemon.json path ({}) |  color=#30C102  bash=".format(REMOTE_DAEMON_PATH) + ME_PATH +  " param1=-dpath param2=default terminal=false refresh=true"
+    try:
         parsed = json.loads(daemoninfo)
-        json_formatted_str = json.dumps(parsed, indent=2, sort_keys=True)
+        json_formatted_str = json.dumps(parsed, indent=2, sort_keys=False)
         #json_formatted_str = yaml.safe_dump(parsed, allow_unicode=True, default_flow_style=False)   #Use this line if you prefer yaml display
         for line in json_formatted_str.splitlines():
-            mystring = "-- " + '‎‎' + line + "| color=white size=11 font='Courier New'"+c.END
+            mystring = "---- " + '‎‎' + line + "| color=white size=11 font='Courier New'"+c.END
             display(mystring)
             #print("-- " + '‎‎' + line + "| color=white size=11 font='Courier New'")+c.END
-    else:
-        print c.WHITE,'{}'.format('    ⚙️ daemon.json'),c.END
-        #if ('No such file or directory' in input_mystring):
-            #print '-- N/A'    
-        if daemon == REMOTE_DAEMON_PATH:
-            print "-- Set custom daemon.json path | color=#30C102 bash=" + ME_PATH +  " param1=-dpath param2=null terminal=false refresh=true"
-        else:
-            print "-- Set default daemon.json path ({}) |  color=#30C102  bash=".format(REMOTE_DAEMON_PATH) + ME_PATH +  " param1=-dpath param2=default terminal=false refresh=true"
-            
-            
-        print "-- "
+    except ValueError as e:
         for line in input_mystring.splitlines():
-            mystring = "-- "  + '‎‎' + line + " |  color=white size=11 font='Courier New'"+c.END
+            mystring = "---- "  + '‎‎' + line + " |  color=white size=11 font='Courier New'"+c.END
             display(mystring)
-            #print "-- "  + '‎‎' + line + " |  color=white size=11 font='Courier New'"+c.END
 
 @timing_decorator
 def print_size(input_mystring, local=True, size=8):
     if input_mystring:
-        print c.WHITE,'{}'.format('    📏 Sizes'),c.END
+        print '-- ',c.WHITE,'{}'.format('    📏 Sizes'),c.END
         for line in input_mystring.splitlines():
             if  'space usage:' in line:
-                print("-- " + '‎‎' + line + "| color=#30C102 size=8 font='Courier New'")
+                print("---- " + '‎‎' + line + "| color=#30C102 size=8 font='Courier New'")
             elif  'SIZE' in line:
-                print("-- " + '‎‎' + line + "| color=yellow size=8 font='Courier New'")
+                print("---- " + '‎‎' + line + "| color=yellow size=8 font='Courier New'")
         
             else:
-                print("-- " + '‎‎' + line + "| color=white size=8 font='Courier New'")
+                print("---- " + '‎‎' + line + "| color=white size=8 font='Courier New'")
     
 
 
@@ -382,7 +357,8 @@ ssh_addon = SSH.replace("<user>",user).replace("<ip>",ip)
 
 if(len(sys.argv) >= 2):
     if(sys.argv[1] == '-s'):
-        if ssh_method=='passwordless':
+        print 'ssh_method:',ssh_method,'local',sys.argv[3] 
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " stop " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " stop " + sys.argv[2]
@@ -390,8 +366,9 @@ if(len(sys.argv) >= 2):
         sys.exit(0)     
 
     elif(sys.argv[1] == '-t'):   
-        print ssh_method    
-        if ssh_method=='passwordless':
+        print sys.argv
+        print 'ssh_method:',ssh_method,'local',sys.argv[3]    
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " start " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " start " + sys.argv[2]
@@ -399,7 +376,8 @@ if(len(sys.argv) >= 2):
         sys.exit(0)    
     
     elif(sys.argv[1] == '-r'):  
-        if ssh_method=='passwordless':
+        print 'ssh_method:',ssh_method   
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " rm " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " rm " + sys.argv[2]
@@ -407,7 +385,7 @@ if(len(sys.argv) >= 2):
         sys.exit(0)    
 
     elif(sys.argv[1] == '-rmf'):   
-        if ssh_method=='passwordless':
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " rm -f " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " rm -f " + sys.argv[2]
@@ -416,7 +394,7 @@ if(len(sys.argv) >= 2):
         sys.exit(0)  
 
     elif(sys.argv[1] == '-b1'):
-        if ssh_method=='passwordless':
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " exec -it " + sys.argv[2] + " /bin/bash"
         else:
             cmd = DOCKER_PATH + " exec -it " + sys.argv[2] + " /bin/bash"
@@ -425,7 +403,7 @@ if(len(sys.argv) >= 2):
         sys.exit(0)     
 
     elif(sys.argv[1] =='-b2'):
-        if ssh_method=='passwordless':
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " exec -it " + sys.argv[2] + " /bin/sh"
         else:
             cmd = DOCKER_PATH + " exec -it " + sys.argv[2] + " /bin/sh"
@@ -434,7 +412,7 @@ if(len(sys.argv) >= 2):
         sys.exit(0)       
 
     elif(sys.argv[1] == '-rmi'):   
-        if ssh_method=='passwordless':
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " rmi " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " rmi " + sys.argv[2]
@@ -443,7 +421,7 @@ if(len(sys.argv) >= 2):
         sys.exit(0)  
 
     elif(sys.argv[1] == '-rmif'):   
-        if ssh_method=='passwordless':
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " rmi -f " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " rmi -f " + sys.argv[2]
@@ -531,6 +509,8 @@ if local_enabled:
     cmd_output = run_script(DOCKERIMAGES_CMD)
     print_images(cmd_output, local=True, size=10)
 
+    print c.WHITE,'{}'.format('    🐞 Debug'),c.END
+    
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Docker Info
     #-----------------------------------------------------------------------------------------------------------
@@ -666,7 +646,7 @@ if ssh_method=='password':
     print_images(cmd_output, local=False, size=10)
     #sys.stdout.write(str('Loading Remote 3')) 
     #sys.stdout.write('\n~~~\n')
-    
+    print c.WHITE,'{}'.format('    🐞 Debug'),c.END
     #-----------------------------------------------------------------------------------------------------------
     # Get Remote Docker Info
     #-----------------------------------------------------------------------------------------------------------
@@ -703,6 +683,7 @@ elif ssh_method=='passwordless':
     cmd_output = run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user))
     print_images(cmd_output, local=False, size=10, ssh=ssh_method)
 
+    print c.WHITE,'{}'.format('    🐞 Debug'),c.END
     #-----------------------------------------------------------------------------------------------------------
     # Get Remote Docker Info (but use the local processing)
     #-----------------------------------------------------------------------------------------------------------
@@ -714,8 +695,7 @@ elif ssh_method=='passwordless':
     #-----------------------------------------------------------------------------------------------------------
     daemoninfo = ''
     daemoninfo = run_script(sshcommand + ' "test -f ' + daemon + ' && cat ' + daemon + '"')
-    if daemoninfo:
-        print_daemon(daemoninfo, local=True, size=10)
+    print_daemon(daemoninfo, local=False, size=10)
     #-----------------------------------------------------------------------------------------------------------
     # Get Sizes (omitted because it takes too long)
     #-----------------------------------------------------------------------------------------------------------
