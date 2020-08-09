@@ -16,6 +16,8 @@ import unicodedata
 import time
 ME_PATH = os.path.realpath(__file__)
 
+start = time.time()
+
 dockerinfodata_path = os.path.dirname(os.path.abspath(__file__)) +'/'+"dockerinfo_data"
 if not os.path.exists(dockerinfodata_path) :
     os.mkdir( dockerinfodata_path, 0755 );
@@ -25,14 +27,21 @@ ip_path = dockerinfodata_path+'/'+"ip.txt"
 user_path = dockerinfodata_path+'/'+"user.txt"
 passwd_path = dockerinfodata_path+'/'+"passwd.txt"
 daemon_path = dockerinfodata_path+'/'+"daemon.txt"
-
+ssh_method_path = dockerinfodata_path+'/'+"ssh_method.txt"
 
 os.environ["PATH"] += os.pathsep + '/usr/local/bin'
 DOCKER_PATH = 'docker'
+SSH = ' -H ssh://<user>@<ip>:22 '
 DOCKERPS_QUICK = DOCKER_PATH + " ps -a --format '{{.ID}}'"
+DOCKERPS_QUICK_SSH = DOCKER_PATH + SSH + " ps -a --format '{{.ID}}'"
 DOCKERPS_CMD_LOCAL = DOCKER_PATH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}^^{{.Size}}'"
+DOCKERPS_CMD_SSH = DOCKER_PATH + SSH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}'"
 DOCKERPS_CMD_REMOTE = DOCKER_PATH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}'"
+DOCKER_GETIMGID = DOCKER_PATH + " inspect --format='{{.Image}}' "
 DOCKERIMAGES_CMD = DOCKER_PATH + ' images --format "{{.Repository}}^^{{.Tag}}^^{{.ID}}^^{{.CreatedSince}}^^{{.Size}}"'
+DOCKERIMAGES_CMD_SSH = DOCKER_PATH + SSH + ' images --format "{{.Repository}}^^{{.Tag}}^^{{.ID}}^^{{.CreatedSince}}^^{{.Size}}"'
+DOCKER_LOGS =  DOCKER_PATH + " logs -t --tail 20 "
+DOCKER_LOGS_SSH =  DOCKER_PATH + " -H ssh://<user>@<ip>:22" + " logs -t --tail 20 "
 REMOTE_DAEMON_PATH = '/etc/docker/daemon.json'
 LOCAL_DAEMON_PATH = os.path.join(os.path.expanduser("~"),'.docker/daemon.json')
 LOCAL_PROMPT = '.*[#\$]'
@@ -49,6 +58,7 @@ ip = ''
 user = ''
 passwd = ''
 daemon=REMOTE_DAEMON_PATH
+ssh_method='password'
 
 class c: 
     RED = '\033[31m' 
@@ -89,13 +99,17 @@ if os.path.isfile(passwd_path) :
 if os.path.isfile(daemon_path) :
     with open(daemon_path, 'r') as file:
         daemon = file.read()
+if os.path.isfile(ssh_method_path) :
+    with open(ssh_method_path, 'r') as file:
+        ssh_method = file.read()
 
 def timing_decorator(func):
     def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)  #comment this line out to time functions.
         start = time.time()
         original_return_val = func(*args, **kwargs)
         end = time.time()
-        #print(''.join(["-- time elapsed in ",(func.__name__),": ",str(end - start)]))
+        print(''.join(["time elapsed in ",(func.__name__),": ",str(end - start)]))
         return original_return_val
 
     return wrapper
@@ -142,69 +156,53 @@ def run_remote_cmd(script, sess, timeout=0.5):
 
     if retry == 0:
         print('ERROR! Something went wrong')   
-
+@timing_decorator
 def run_script(script):
     return (subprocess.Popen([script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()[0].strip())
+    '''
+    p1 = subprocess.Popen([script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True)
+    p2 = subprocess.Popen(["/usr/local/bin/ansifilter"], stdin=p1.stdout, stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True)
+    p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
+    output = p2.communicate()[0].strip()
+    return output
+    '''
 
-def escape_ansi(line):
-    ansi_regex = r'\x1b(' \
-                 r'(\[\??\d+[hl])|' \
-                 r'([=<>a-kzNM78])|' \
-                 r'([\(\)][a-b0-2])|' \
-                 r'(\[\d{0,2}[ma-dgkjqi])|' \
-                 r'(\[\d+;\d+[hfy]?)|' \
-                 r'(\[;?[hf])|' \
-                 r'(#[3-68])|' \
-                 r'([01356]n)|' \
-                 r'(O[mlnp-z]?)|' \
-                 r'(/Z)|' \
-                 r'(\d+)|' \
-                 r'(\[\?\d;\d0c)|' \
-                 r'(\d;\dR))'
-    ansi_escape = re.compile(ansi_regex, flags=re.IGNORECASE)
-    return ansi_escape.sub('', line).replace("\r", "\\r").replace("\n", "\\n").replace("]0;","").replace("\t","\\t")
 
-all_chars = (unichr(i) for i in xrange(sys.maxunicode))
-categories = {'Cc'}
-#control_chars = ''.join(c for c in all_chars if unicodedata.category(c) in categories)
-# or equivalently and much more efficiently
-control_chars = ''.join(map(unichr, range(0x00,0x20) + range(0x7f,0xa0)))
-control_char_re = re.compile('[%s]' % re.escape(control_chars))
-
-def remove_control_chars(s):
-    return control_char_re.sub('', s)
 
 @timing_decorator
-def print_containers(input_mystring, local=True, size=8, sess=None):
+def print_containers(input_mystring, local=True, size=8, sess=None, ssh='password'):
     global dockerps_images
     if local:
-        print c.WHITE,'{}'.format('    📦 Containers ({})'.format(c.GREEN + run_script(DOCKERPS_QUICK + ' | wc -l | xargs')+c.END)),c.END
-        print '--',c.WHITE,'{:^13s}'.format('CONTAINER ID'),'{:<25s}'.format(' IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:<20s}'.format('SIZE'),c.END," | size={} font='Courier New'".format(size)
-    else:
+        print c.WHITE,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK + ' | wc -l | xargs') + ']' + c.END)),c.END
+        print '--',c.WHITE,'{:<13s}'.format('CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:<20s}'.format('SIZE'),c.END," | size={} font='Courier New'".format(size)
+    elif ssh=='passwordless':
+        print c.WHITE,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l | xargs') + ']' + c.END)),c.END        
+        print '--',c.WHITE,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:<20s}'.format('    NAME'),c.END," | size={} font='Courier New'".format(size)
+    else: #pexpect (ssh+password)
         cmd_output = run_remote_cmd(DOCKERPS_QUICK + ' | wc -l | xargs', child)
         for line in cmd_output.splitlines():
-            #print 'line:',line
             num = [int(s) for s in line.split() if s.isdigit()]
-            #print 'num',num,'type(num)',type(num)
-            #if ([int(s) for s in line.split() if s.isdigit()]) != None:
             if num:
-                #print 'Found it'
-                #num = str([int(s) for s in line.split() if s.isdigit()])
                 break
         print c.WHITE+'{}'.format('    📦 Containers {}'.format(c.GREEN +str(num)+c.END))+c.END
         print '--',c.WHITE,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:<20s}'.format('    NAME'),c.END," | size={} font='Courier New'".format(size)
-        
-    for line in input_mystring.splitlines():
+    for i, line in enumerate(input_mystring.splitlines()):
+        #if i==2:
+            #exit(0)
         if '--format' in line or '{{' in line :
             continue
         split_line = line.split("^^")
         if len(split_line) < 5:
             continue
-        if local:
-            mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<25s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<21s}'.format(split_line[4])+c.CYAN+'{:<20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
+        if local or ssh=='passwordless':
+            if ssh=='passwordless':
+                mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+                get_img_id =DOCKER_GETIMGID.replace('inspect','-H ssh://'+user+'@'+ip+':22 inspect') + split_line[0]
+                
+            else:
+                mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<25s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<21s}'.format(split_line[4])+c.CYAN+'{:<20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
+                get_img_id = DOCKER_GETIMGID + split_line[0]
             display(mystring)
-            #print '--',c.BLUE,'{:<13s}'.format(split_line[0]),c.YELLOW,'{:<25s}'.format(split_line[1]),c.RED,'{:<22s}'.format(split_line[2]),c.MAGENTA,'{:<28s}'.format(split_line[3]),c.GREEN,'{:<21s}'.format(split_line[4]),c.CYAN,'{:<20s}'.format(split_line[5]),c.END," | size={} font='Courier New'".format(size)
-            get_img_id = DOCKER_PATH + " inspect --format='{{.Image}}' " + split_line[0]
             output = run_script(get_img_id)
             tmp = output[output.index(':')+1:]
             image_id = tmp[0:12]
@@ -212,13 +210,15 @@ def print_containers(input_mystring, local=True, size=8, sess=None):
         else:
             mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
             display(mystring)
-            #print '--',c.BLUE,'{:<13s}'.format(split_line[0]),c.YELLOW,'{:<31s}'.format(split_line[1]),c.RED,'{:<22s}'.format(split_line[2]),c.MAGENTA,'{:<28s}'.format(split_line[3]),c.GREEN,'{:<20s}'.format(split_line[4]),c.END," | size={} font='Courier New'".format(size)
-            
-        inspect_cmd = DOCKER_PATH + " inspect " + split_line[0]# + " 2> /dev/null"
         #print 'inspect_cmd:',inspect_cmd
-        if local:
+        if local or ssh=='passwordless':
+            if ssh=='passwordless':
+                inspect_cmd = DOCKER_PATH + ssh_addon + 'inspect ' + split_line[0] # + " 2> /dev/null"
+            else:    
+                inspect_cmd = DOCKER_PATH + " inspect " + split_line[0]# + " 2> /dev/null"
             inspect_output = run_script(inspect_cmd)
         else:
+            inspect_cmd = DOCKER_PATH + " inspect " + split_line[0]#
             inspect_output = run_remote_cmd(inspect_cmd, sess)
         #print 'inspect_output:',inspect_output;exit(0) 
         #exit(0)   
@@ -227,28 +227,29 @@ def print_containers(input_mystring, local=True, size=8, sess=None):
         for inspect_line in inspect_output.splitlines():
             #inspect_clean = escape_ansi(inspect_line) 
             #mystring = "------ "  + '‎‎' + repr(inspect_line) + " |  color=white size=11 font='Courier New'"
-            mystring = "------ "  + '‎‎' + repr(inspect_line).replace("'","") + " |  color=white size=11 font='Courier New'"
+            #tmp = '‎‎' + repr(inspect_line)[1:-1]
+            tmp = repr(inspect_line)
+            mystring = "------ "  + '‎‎' +  tmp + " | color=white size=11 font='Courier New'"
             display(mystring)
             #print "------ "  + '‎‎' + inspect_line+ " |  color=white size=11 font='Courier New'"+c.END
+         
             
-        log_cmd = DOCKER_PATH + " logs -t --tail 20 " + split_line[0].strip() +" 2> /dev/null"
-        if local:
-            log_output = run_script(log_cmd)
+        if local or ssh=='passwordless':
+            if ssh=='passwordless': 
+                log_cmd = DOCKER_LOGS_SSH.replace('<user>',user).replace('<ip>',ip) + split_line[0].strip()  + " 2>&1"
+            else:
+                log_cmd = DOCKER_LOGS + split_line[0].strip()# +" 2> /dev/null"
+            log_output = run_script(log_cmd)    
         else:
+            log_cmd = DOCKER_LOGS + split_line[0].strip()
             log_output = run_remote_cmd(log_cmd, sess)
         
         #print "---- 🪵 Log"
         print "---- 📔 Log"
-        #print "---- Log | image={}".format(log_icon2).strip()
         for log_line in log_output.splitlines():
-            log_clean = repr(escape_ansi(log_line))
-            #log_clean = repr(log_line) 
-            #mystring = "------ " , log_clean.strip(), "| color=white size=11 font='Courier New'",c.END
-            mystring = "------ "  +log_clean.strip().replace("'","")+ " |  color=white size=10 font='Courier New'"
+            mystring = "------ " + repr(log_line) + " | color=white size=10 font='Courier New'"
             display(mystring)
-            #print "------ " , log_clean.strip(), "| color=white size=11 font='Courier New'",c.END
-        #exit(0)
-        if local:
+        if local or ssh=='passwordless':
             if 'Up' in split_line[3]:
                 print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-s param2={} terminal=false refresh=true".format(split_line[0])
                 print "---- ↩️ Enter | none"+c.END
@@ -261,12 +262,13 @@ def print_containers(input_mystring, local=True, size=8, sess=None):
                 print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-r param2={} terminal=false refresh=true".format(split_line[0])
 
 @timing_decorator          
-def print_images(input_mystring, local=True, size=8):
+def print_images(input_mystring, local=True, size=8, ssh='password'):
     global dockerps_images
-    
     if local:
-        print c.WHITE,'{}'.format('    🖼️ Images ({})'.format(c.GREEN + run_script(DOCKERIMAGES_CMD + ' | wc -l')+c.END)),c.END
-    else:
+        print c.WHITE,'{}'.format('    🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD + ' | wc -l') + ']' + c.END)),c.END
+    elif ssh=='passwordless':
+        print c.WHITE,'{}'.format('    🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l') + ']' + c.END)),c.END
+    else: #pexpect (ssh+password)
         num=''
         cmd_output = run_remote_cmd(DOCKERIMAGES_CMD + ' | wc -l', child)
         for line in cmd_output.splitlines():
@@ -284,8 +286,8 @@ def print_images(input_mystring, local=True, size=8):
         mystring = '-- '+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:<10s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
         display(mystring)
         #print '-- ',c.BLUE,'{:<45s}'.format(split_line[0]),c.RED,'{:<15s}'.format(split_line[1]),c.YELLOW,'{:<15s}'.format(split_line[2]),c.MAGENTA,'{:<15s}'.format(split_line[3]),c.GREEN,'{:<10s}'.format(split_line[4]),c.END," | size={} font='Courier New'".format(size)
-        if local:
-            if split_line[2] not in dockerps_images:
+        if local or ssh=='passwordless':
+            if split_line[2] not in dockerps_images:    # if this image is not used by a container
                 print "---- 🗑️ Remove | bash=" + ME_PATH +  " param1=-rmi param2={} terminal=false refresh=true".format(split_line[2])
             else:
                 print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmif param2={} terminal=false refresh=true".format(split_line[2])
@@ -344,68 +346,99 @@ def print_size(input_mystring, local=True, size=8):
 def print_refresh():
     print "---"
     print "🔄 Refresh | refresh=true"
+    end = time.time()
+    print(''.join(["Elapsed Time: ",str(end - start).split('.')[0]]))    
     print "---"                   
+    sys.exit(0)
 #-----------------------------------------------------------------------------------------------------------
 # Handle Inputs
 #-----------------------------------------------------------------------------------------------------------
 parser = argparse.ArgumentParser()
-parser.add_argument('-s', action='store', dest='localstop',help='Stop Running Container')
-parser.add_argument('-t', action='store', dest='localstart',help='Start A Stopped Container')
-parser.add_argument('-r', action='store', dest='localremove',help='Remove A Stopped Container')
-parser.add_argument('-rmf', action='store', dest='localforceremove',help='Force Remove A Running Container')
-parser.add_argument('-b1', action='store', dest='localbash',help='Bash Into A Running Container')
-parser.add_argument('-b2', action='store', dest='localsh',help='Sh Into A Running Container')
-parser.add_argument('-rmi', action='store', dest='localremoveimage',help='Remove An Image')
-parser.add_argument('-rmif', action='store', dest='localforceremoveimage',help='Force Remove An Image')
-parser.add_argument('-local', action='store', dest='locallocal',help='Toggle Local Server Support')
-parser.add_argument('-remote', action='store', dest='localremote',help='Toggle Remote Server Support')
-parser.add_argument('-ip', action='store', dest='localip',help='Remote IP Address')
-parser.add_argument('-user', action='store', dest='localuser',help='Remote Username')
-parser.add_argument('-passwd', action='store', dest='localpasswd',help='Remote Password')
-parser.add_argument('-dpath', action='store', dest='localdpath',help='Set Remote daemon.json Path')
+parser.add_argument('-s', action='store', dest='lstop',help='Stop Running Container')
+parser.add_argument('-t', action='store', dest='lstart',help='Start A Stopped Container')
+parser.add_argument('-r', action='store', dest='lremove',help='Remove A Stopped Container')
+parser.add_argument('-rmf', action='store', dest='lforceremove',help='Force Remove A Running Container')
+parser.add_argument('-b1', action='store', dest='lbash',help='Bash Into A Running Container')
+parser.add_argument('-b2', action='store', dest='lsh',help='Sh Into A Running Container')
+parser.add_argument('-rmi', action='store', dest='lremoveimage',help='Remove An Image')
+parser.add_argument('-rmif', action='store', dest='lforceremoveimage',help='Force Remove An Image')
+parser.add_argument('-local', action='store', dest='llocal',help='Toggle Local Server Support')
+parser.add_argument('-remote', action='store', dest='lremote',help='Toggle Remote Server Support')
+parser.add_argument('-ip', action='store', dest='lip',help='Remote IP Address')
+parser.add_argument('-user', action='store', dest='luser',help='Remote Username')
+parser.add_argument('-passwd', action='store', dest='lpasswd',help='Remote Password')
+parser.add_argument('-dpath', action='store', dest='lpath',help='Set Remote daemon.json Path')
+parser.add_argument('-ssh_method', action='store', dest='lssh_method',help='Use pexpect with password (slow) or public/private keypair for ssh (fast)')
+
+ssh_addon = SSH.replace("<user>",user).replace("<ip>",ip)
 
 if(len(sys.argv) >= 2):
-    if(sys.argv[1] == '-s'):   
-        cmd = DOCKER_PATH + " stop " + sys.argv[2]
+    if(sys.argv[1] == '-s'):
+        if ssh_method=='passwordless':
+            cmd = DOCKER_PATH + ssh_addon + " stop " + sys.argv[2]
+        else:
+            cmd = DOCKER_PATH + " stop " + sys.argv[2]
         run_script(cmd)
         sys.exit(0)     
 
     elif(sys.argv[1] == '-t'):   
-        cmd = DOCKER_PATH + " start " + sys.argv[2]
+        print ssh_method    
+        if ssh_method=='passwordless':
+            cmd = DOCKER_PATH + ssh_addon + " start " + sys.argv[2]
+        else:
+            cmd = DOCKER_PATH + " start " + sys.argv[2]
         run_script(cmd)
         sys.exit(0)    
     
-    elif(sys.argv[1] == '-r'):   
-        cmd = DOCKER_PATH + " rm " + sys.argv[2]
+    elif(sys.argv[1] == '-r'):  
+        if ssh_method=='passwordless':
+            cmd = DOCKER_PATH + ssh_addon + " rm " + sys.argv[2]
+        else:
+            cmd = DOCKER_PATH + " rm " + sys.argv[2]
         run_script(cmd)
         sys.exit(0)    
 
     elif(sys.argv[1] == '-rmf'):   
-        cmd = DOCKER_PATH + " rm -f " + sys.argv[2]
+        if ssh_method=='passwordless':
+            cmd = DOCKER_PATH + ssh_addon + " rm -f " + sys.argv[2]
+        else:
+            cmd = DOCKER_PATH + " rm -f " + sys.argv[2]
         #print cmd
         run_script(cmd)
         sys.exit(0)  
 
     elif(sys.argv[1] == '-b1'):
-        cmd = DOCKER_PATH + " exec -it " + sys.argv[2] + " /bin/bash"
+        if ssh_method=='passwordless':
+            cmd = DOCKER_PATH + ssh_addon + " exec -it " + sys.argv[2] + " /bin/bash"
+        else:
+            cmd = DOCKER_PATH + " exec -it " + sys.argv[2] + " /bin/bash"
         #print cmd
         os.system('echo "Running: {}";{}'.format(cmd,cmd))
         sys.exit(0)     
 
     elif(sys.argv[1] =='-b2'):
-        cmd = DOCKER_PATH + " exec -it " + sys.argv[2] + " /bin/sh"
+        if ssh_method=='passwordless':
+            cmd = DOCKER_PATH + ssh_addon + " exec -it " + sys.argv[2] + " /bin/sh"
+        else:
+            cmd = DOCKER_PATH + " exec -it " + sys.argv[2] + " /bin/sh"
         #print cmd
         os.system('echo "Running: {}";{}'.format(cmd,cmd))
         sys.exit(0)       
 
     elif(sys.argv[1] == '-rmi'):   
-        cmd = DOCKER_PATH + " rmi " + sys.argv[2]
+        if ssh_method=='passwordless':
+            cmd = DOCKER_PATH + ssh_addon + " rmi " + sys.argv[2]
+        else:
+            cmd = DOCKER_PATH + " rmi " + sys.argv[2]
         run_script(cmd)
         #print cmd
         sys.exit(0)  
 
     elif(sys.argv[1] == '-rmif'):   
-        cmd = DOCKER_PATH + " rmi -f " + sys.argv[2]
+        if ssh_method=='passwordless':
+            cmd = DOCKER_PATH + ssh_addon + " rmi -f " + sys.argv[2]
+        else:
+            cmd = DOCKER_PATH + " rmi -f " + sys.argv[2]
         #print cmd
         run_script(cmd)
         sys.exit(0)  
@@ -459,6 +492,14 @@ if(len(sys.argv) >= 2):
             f.write(daemon)
         sys.exit(1)
         
+    elif(sys.argv[1] == '-ssh_method'):
+        if sys.argv[2] == 'password':   
+            ssh_method = 'password'
+        else:
+            ssh_method = 'passwordless'
+        with open(ssh_method_path, 'w') as f:
+                f.write(ssh_method)
+        sys.exit(0)
         
 #print '🐳'
 #print '| image={}'.format(moby_icon)
@@ -469,7 +510,7 @@ print '---'
 
 if local_enabled:
     print "🏠 Local Docker |  color=#30C102 bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true" 
-    print '---'
+    #print '---'
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Docker Containers
     #-----------------------------------------------------------------------------------------------------------
@@ -498,7 +539,7 @@ if local_enabled:
     print_daemon(daemoninfo, local=True, size=10)
     
     #-----------------------------------------------------------------------------------------------------------
-    # Get Sizes
+    # Get Local Sizes
     #-----------------------------------------------------------------------------------------------------------
     dockerdf_output=run_script(DOCKER_PATH + ' system df -v')
     print_size(dockerdf_output)
@@ -526,17 +567,38 @@ else:
     print_refresh()
     sys.exit(0)
 
-print '-- Set IP |  bash=' + ME_PATH +  ' param1=-ip param2=null terminal=false refresh=true'
-print '----', ip
-print '-- Set username |  bash=' + ME_PATH +  ' param1=-user param2=null terminal=false refresh=true'
-print '----', user
-print '-- Set password |  bash=' + ME_PATH +  ' param1=-passwd param2=null terminal=false refresh=true'
-if passwd != '':
-    print '----', passwd.replace(passwd,'****')
+if ssh_method=='password':
+    print '-- Password (slow) | checked=true'
+    print '---- Set IP | bash=' + ME_PATH + ' param1=-ip param2=null terminal=false refresh=true'
+    print '------', ip
+    print '---- Set username | bash=' + ME_PATH + ' param1=-user param2=null terminal=false refresh=true'
+    print '------', user
+    print '---- Set password | bash=' + ME_PATH + ' param1=-passwd param2=null terminal=false refresh=true'
+    if passwd != '':
+        print '------', passwd.replace(passwd,'****')
+    if '' in (ip, user, passwd):
+        print_refresh() 
+        sys.exit(0)
+else:
+    print '-- Password (slow) | bash=' + ME_PATH + ' param1=-ssh_method param2=password terminal=false refresh=true'
 
-if '' in (ip, user, passwd):
-    print_refresh() 
-    sys.exit(0)
+if ssh_method == 'passwordless':
+    print '-- SSH Keys (fast) | checked=true'
+    print '---- Set IP | bash=' + ME_PATH + ' param1=-ip param2=null terminal=false refresh=true'
+    print '------', ip
+    print '---- Set username | bash=' + ME_PATH + ' param1=-user param2=null terminal=false refresh=true'
+    print '------', user
+    if '' in (ip, user):
+        print_refresh() 
+        sys.exit(0)
+    #ssh_addon = SSH.replace("<user>",user).replace("<ip>",ip)
+    
+else:
+    print '-- SSH Keys (fast) | bash=' + ME_PATH + ' param1=-ssh_method param2=passwordless terminal=false refresh=true'
+
+
+
+
 
 #-----------------------------------------------------------------------------------------------------------
 # Remote Docker
@@ -544,80 +606,114 @@ if '' in (ip, user, passwd):
 #-----------------------------------------------------------------------------------------------------------
 # SSH To Remote Server
 #-----------------------------------------------------------------------------------------------------------
-SSH_CMD = 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {}'.format(user)
-command = SSH_CMD+'@{}'.format(ip)
-#logger.info('SSH to device.')
-#logger.info('SSH command is: ' + c.CYAN + c.UNDERLINE + '{}'.format(command) + c.END)
-child = pexpect.spawn(command)
-child.logfile_read = None  #Set to logger to see the child output
-child.logfile_send = None  #Set to None to hide password
+SSH_CMD_PWD = 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o PubkeyAuthentication=no {}'.format(user)
+SSH_CMD_NOPWD = 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=ERROR {}'.format(user)
 
-i = child.expect([pexpect.TIMEOUT, '.*assword:', '.*refused', pexpect.EOF])
-#print('i is: {}'.format(i))
-if i != 1:
-    print ('ERROR! SSH Failed:', ip)
-    exit(0)
-child.delaybeforesend = 1
-child.sendline(passwd)
-child.sendline('')
+if ssh_method=='password':
+    command = SSH_CMD_PWD+'@{}'.format(ip)
+    #logger.info('SSH to device.')
+    #logger.info('SSH command is: ' + c.CYAN + c.UNDERLINE + '{}'.format(command) + c.END)
+    child = pexpect.spawn(command)
+    child.logfile_read = None  #Set to logger to see the child output
+    child.logfile_send = None  #Set to None to hide password
 
-i = child.expect([pexpect.TIMEOUT, 'Permission denied', 'closed by remote host', '{}'.format(LOCAL_PROMPT), pexpect.EOF])
-#print('ssh i is: {}'.format(i))
-if i == 0:
-    #print(child, 'ERROR! SSH timed out:', ip)
-    exit(0)
-elif i == 1:
-    #print(child, 'ERROR! Incorrect password:', ip)
-    exit(0)
-elif i == 2:
-    #print(child, 'ERROR! Connection Closed:', ip)
-    exit(0)
-result = child.before.decode('utf-8', 'ignore')
-#print('result',result)
-#print child
-print "---"
+    i = child.expect([pexpect.TIMEOUT, '.*assword:', '.*refused', pexpect.EOF])
+    #print('i is: {}'.format(i))
+    if i != 1:
+        print ('ERROR! SSH Failed:', ip)
+        sys.exit(0)
+    child.delaybeforesend = 1
+    child.sendline(passwd)
+    child.sendline('')
+
+    i = child.expect([pexpect.TIMEOUT, 'Permission denied', 'closed by remote host', '{}'.format(LOCAL_PROMPT), pexpect.EOF])
+    #print('ssh i is: {}'.format(i))
+    if i == 0:
+        #print(child, 'ERROR! SSH timed out:', ip)
+        sys.exit(0)
+    elif i == 1:
+        #print(child, 'ERROR! Incorrect password:', ip)
+        sys.exit(0)
+    elif i == 2:
+        #print(child, 'ERROR! Connection Closed:', ip)
+        sys.exit(0)
+    result = child.before.decode('utf-8', 'ignore')
+    #print('result',result)
+    #print child
+    print "---"
+
+    
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Remote Docker Containers
+    #-----------------------------------------------------------------------------------------------------------
+    cmd_output = run_remote_cmd(DOCKERPS_CMD_REMOTE, child)
+    print_containers(cmd_output, local=False, size=10, sess=child)  
+    #sys.stdout.write(str('Loading Remote 2')) 
+    #sys.stdout.write('\n~~~\n')
+        
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Remote Docker Images
+    #-----------------------------------------------------------------------------------------------------------
+    cmd_output = run_remote_cmd(DOCKERIMAGES_CMD, child)
+    print_images(cmd_output, local=False, size=10)
+    #sys.stdout.write(str('Loading Remote 3')) 
+    #sys.stdout.write('\n~~~\n')
+    
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Remote Docker Info
+    #-----------------------------------------------------------------------------------------------------------
+    daemon_output=run_remote_cmd(DOCKER_PATH + ' info' , child)
+    print_info(daemon_output, local=False, size=11)
+
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Remote Docker Daemon (if any)
+    #-----------------------------------------------------------------------------------------------------------
+    daemoninfo = ''
+    daemon_output=run_remote_cmd('cat '+ daemon, child)
+    print_daemon(daemon_output, local=False)
+
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Sizes (omitted because it takes too long)
+    #-----------------------------------------------------------------------------------------------------------
+    #dockerdf_output=run_remote_cmd(DOCKER_PATH + ' system df -v', child, timeout=2)
+    #print_size(dockerdf_output)
+    
+    child.close()
+    
+elif ssh_method=='passwordless':
+    sshcommand = SSH_CMD_NOPWD+'@{}'.format(ip) + ' '
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Remote Docker Containers (SSH)
+    #-----------------------------------------------------------------------------------------------------------
+    cmd_output = run_script(DOCKERPS_CMD_SSH.replace('<ip>',ip).replace('<user>',user))
+    #print cmd_output
+    print_containers(cmd_output, local=False, size=10, ssh=ssh_method)  
+
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Remote Docker Images (SSH)
+    #-----------------------------------------------------------------------------------------------------------
+    cmd_output = run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user))
+    print_images(cmd_output, local=False, size=10, ssh=ssh_method)
+
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Local Docker Info
+    #-----------------------------------------------------------------------------------------------------------
+    dockerinfo_output=run_script(DOCKER_PATH + ssh_addon + ' info')
+    print_info(dockerinfo_output, local=True, size=10)
+    
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Local Docker Daemon (if any)
+    #-----------------------------------------------------------------------------------------------------------
+    daemoninfo = ''
+    daemoninfo = run_script(sshcommand + ' "test -f ' + daemon + ' && cat ' + daemon + '"')
+    if daemoninfo:
+        print_daemon(daemoninfo, local=True, size=10)
+    #-----------------------------------------------------------------------------------------------------------
+    # Get Sizes (omitted because it takes too long)
+    #-----------------------------------------------------------------------------------------------------------
+    #dockerdf_output=run_script(sshcommand + DOCKER_PATH + ' "system df -v"')
+    #print_size(dockerdf_output)
 
 
-#-----------------------------------------------------------------------------------------------------------
-# Get Remote Docker Containers
-#-----------------------------------------------------------------------------------------------------------
-cmd_output = run_remote_cmd(DOCKERPS_CMD_REMOTE, child)
-print_containers(cmd_output, local=False, size=10, sess=child)  
-#sys.stdout.write(str('Loading Remote 2')) 
-#sys.stdout.write('\n~~~\n')
-
-#-----------------------------------------------------------------------------------------------------------
-# Get Remote Docker Images
-#-----------------------------------------------------------------------------------------------------------
-cmd_output = run_remote_cmd(DOCKERIMAGES_CMD, child)
-print_images(cmd_output, local=False, size=10)
-#sys.stdout.write(str('Loading Remote 3')) 
-#sys.stdout.write('\n~~~\n')
-
-#-----------------------------------------------------------------------------------------------------------
-# Get Remote Docker Info
-#-----------------------------------------------------------------------------------------------------------
-daemon_output=run_remote_cmd(DOCKER_PATH + ' info' , child)
-print_info(daemon_output, local=False, size=11)
-#sys.stdout.write(str('Loading Remote 4')) 
-#sys.stdout.write('\n~~~\n')
-
-#-----------------------------------------------------------------------------------------------------------
-# Get Remote Docker Daemon (if any)
-#-----------------------------------------------------------------------------------------------------------
-daemoninfo = ''
-daemon_output=run_remote_cmd('cat '+ daemon, child)
-print_daemon(daemon_output, local=False)
-#sys.stdout.write(str('Loading Remote 5')) 
-#sys.stdout.write('\n~~~\n')
-
-#-----------------------------------------------------------------------------------------------------------
-# Get Sizes
-#-----------------------------------------------------------------------------------------------------------
-dockerdf_output=run_remote_cmd(DOCKER_PATH + ' system df -v', child, timeout=2)
-print_size(dockerdf_output)
-#print '| image={}'.format(moby_icon2)
-#sys.stdout.write('\n~~~\n')
-
-child.close()
 print_refresh()
+
