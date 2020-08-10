@@ -465,23 +465,19 @@ if(len(sys.argv) >= 2):
     elif(sys.argv[1] == '-user'):   
         cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter Username On Your Remote Server. \n\nIt will be stored in:\n{}".format(user_path) + "  \" with icon note default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
         result = run_input_script(cmd)
-        if 'canceled' in result:
-            sys.exit(1)
-        else:
+        if 'canceled'  not in result[1]:
             user = result[0]        
-        with open(user_path, 'w') as f:
-            f.write(user)
+            with open(user_path, 'w') as f:
+                f.write(user)
         sys.exit(1)
 
     elif(sys.argv[1] == '-passwd'):   
         cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter The Password For Your Remote Server. \n\nIt will be stored in:\n{}".format(passwd_path) + "  \" with icon note with hidden answer default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
         result = run_input_script(cmd)
-        if 'canceled' in result:
-            sys.exit(1)
-        else:
+        if 'canceled'  not in result[1]:
             passwd = result[0]        
-        with open(passwd_path, 'w') as f:
-            f.write(passwd)
+            with open(passwd_path, 'w') as f:
+                f.write(passwd)
         sys.exit(1)
      
     elif(sys.argv[1] == '-dpath'):  
@@ -490,9 +486,7 @@ if(len(sys.argv) >= 2):
         else:
             cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter The path to daemon.json For Your Remote Server. \n\nIt will be stored in:\n{}".format(daemon_path) + "  \" with icon note default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
             result = run_input_script(cmd)
-            if 'canceled' in result:
-                sys.exit(1)
-            else:
+            if 'canceled'  not in result[1]:
                 daemon = result[0]        
         with open(daemon_path, 'w') as f:
             f.write(daemon)
@@ -591,6 +585,9 @@ if ssh_method=='password':
         sys.exit(0)
 else:
     print '-- Password (slow) | bash=' + ME_PATH + ' param1=-ssh_method param2=password terminal=false refresh=true'
+    print '---- Click to enable | bash=' + ME_PATH + ' param1=-ssh_method param2=password terminal=false refresh=true'
+    print '---- This method will manually ssh to your sever'
+    print '---- and run the docker commands at the prompt'
 
 if ssh_method == 'passwordless':
     print '-- SSH Keys (fast) | checked=true'
@@ -607,6 +604,9 @@ if ssh_method == 'passwordless':
     
 else:
     print '-- SSH Keys (fast) | bash=' + ME_PATH + ' param1=-ssh_method param2=passwordless terminal=false refresh=true'
+    print '---- Click to enable | bash=' + ME_PATH + ' param1=-ssh_method param2=passwordless terminal=false refresh=true'
+    print '---- For this to work, you must have passwordless'
+    print '---- ssh access to your remote docker server already setup'
 
 
 
