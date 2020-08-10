@@ -165,7 +165,9 @@ def run_script(script):
     output = p2.communicate()[0].strip()
     return output
     '''
-
+def run_input_script(script):
+    stdout,stderr = (subprocess.Popen([script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate())
+    return (stdout.strip(),stderr.strip())
 
 
 @timing_decorator
@@ -278,9 +280,9 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
         #print '-- ',c.BLUE,'{:<45s}'.format(split_line[0]),c.RED,'{:<15s}'.format(split_line[1]),c.YELLOW,'{:<15s}'.format(split_line[2]),c.MAGENTA,'{:<15s}'.format(split_line[3]),c.GREEN,'{:<10s}'.format(split_line[4]),c.END," | size={} font='Courier New'".format(size)
         if local or ssh=='passwordless':
             if split_line[2] not in dockerps_images:    # if this image is not used by a container
-                print "---- 🗑️ Remove | bash=" + ME_PATH +  " param1=-rmi param2={} terminal=false refresh=true".format(split_line[2])
+                print "---- 🗑️ Remove | bash=" + ME_PATH +  " param1=-rmi param2={}  param3={} terminal=false refresh=true".format(split_line[2], local)
             else:
-                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmif param2={} terminal=false refresh=true".format(split_line[2])
+                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmif param2={}  param3={} terminal=false refresh=true".format(split_line[2],local)
 
 @timing_decorator    
 def print_info(input_mystring, local=True, size=11):
@@ -292,12 +294,14 @@ def print_info(input_mystring, local=True, size=11):
         #print "-- "  + '‎‎' + info_line + " |  color=white size=11 font='Courier New'"+c.END
 
 @timing_decorator
-def print_daemon(input_mystring, local=True, size=11):
+def print_daemon(input_mystring, path=None, local=True, size=11):
     print '-- ',c.WHITE,'{}'.format('    ⚙️ daemon.json'),c.END
-    if daemon == REMOTE_DAEMON_PATH and local==False:
-        print "---- Set custom daemon.json path | color=#30C102 bash=" + ME_PATH +  " param1=-dpath param2=null terminal=false refresh=true"
-    else:
-        print "---- Set default daemon.json path ({}) |  color=#30C102  bash=".format(REMOTE_DAEMON_PATH) + ME_PATH +  " param1=-dpath param2=default terminal=false refresh=true"
+    print "---- Using path: {} | color=gray".format(path)
+    if local==False:
+        if path == REMOTE_DAEMON_PATH:
+            print "---- Set custom daemon.json path | color=#30C102 bash=" + ME_PATH +  " param1=-dpath param2=null terminal=false refresh=true"
+        else:
+            print "---- Set default daemon.json path ({}) |  color=#30C102  bash=".format(REMOTE_DAEMON_PATH) + ME_PATH +  " param1=-dpath param2=default terminal=false refresh=true"
     try:
         parsed = json.loads(daemoninfo)
         json_formatted_str = json.dumps(parsed, indent=2, sort_keys=False)
@@ -316,13 +320,14 @@ def print_size(input_mystring, local=True, size=8):
     if input_mystring:
         print '-- ',c.WHITE,'{}'.format('    📏 Sizes'),c.END
         for line in input_mystring.splitlines():
+            tmp = repr(line)
             if  'space usage:' in line:
-                print("---- " + '‎‎' + line + "| color=#30C102 size=8 font='Courier New'")
+                print("---- "+ tmp + "| color=#30C102 size=8 font='Courier New'")
             elif  'SIZE' in line:
-                print("---- " + '‎‎' + line + "| color=yellow size=8 font='Courier New'")
+                print("---- "+ tmp + "| color=yellow size=8 font='Courier New'")
         
             else:
-                print("---- " + '‎‎' + line + "| color=white size=8 font='Courier New'")
+                print("---- "+ tmp + "| color=white size=8 font='Courier New'")
     
 
 
@@ -449,21 +454,32 @@ if(len(sys.argv) >= 2):
             
     elif(sys.argv[1] == '-ip'):   
         cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter The IP Address Of Your Remote Server. \n\nIt will be stored in:\n{}".format(ip_path) + "  \" with icon note default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
-        ip = run_script(cmd)
-        with open(ip_path, 'w') as f:
-            f.write(ip)
+        result = run_input_script(cmd)
+        print'result:',result
+        if 'canceled'  not in result[1]:
+            ip = result[0]
+            with open(ip_path, 'w') as f:
+                f.write(ip)
         sys.exit(1)
 
     elif(sys.argv[1] == '-user'):   
         cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter Username On Your Remote Server. \n\nIt will be stored in:\n{}".format(user_path) + "  \" with icon note default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
-        user = run_script(cmd)
+        result = run_input_script(cmd)
+        if 'canceled' in result:
+            sys.exit(1)
+        else:
+            user = result[0]        
         with open(user_path, 'w') as f:
             f.write(user)
         sys.exit(1)
 
     elif(sys.argv[1] == '-passwd'):   
-        cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter The Password For Your Remote Server. \n\nIt will be stored in:\n{}".format(passwd_path) + "  \" with icon note default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
-        passwd = run_script(cmd)
+        cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter The Password For Your Remote Server. \n\nIt will be stored in:\n{}".format(passwd_path) + "  \" with icon note with hidden answer default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
+        result = run_input_script(cmd)
+        if 'canceled' in result:
+            sys.exit(1)
+        else:
+            passwd = result[0]        
         with open(passwd_path, 'w') as f:
             f.write(passwd)
         sys.exit(1)
@@ -473,7 +489,11 @@ if(len(sys.argv) >= 2):
             daemon =  REMOTE_DAEMON_PATH 
         else:
             cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter The path to daemon.json For Your Remote Server. \n\nIt will be stored in:\n{}".format(daemon_path) + "  \" with icon note default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
-            daemon = run_script(cmd)
+            result = run_input_script(cmd)
+            if 'canceled' in result:
+                sys.exit(1)
+            else:
+                daemon = result[0]        
         with open(daemon_path, 'w') as f:
             f.write(daemon)
         sys.exit(1)
@@ -524,7 +544,7 @@ if local_enabled:
     if os.path.isfile(LOCAL_DAEMON_PATH) :
         with open(LOCAL_DAEMON_PATH, 'r') as file:
             daemoninfo = file.read()
-    print_daemon(daemoninfo, local=True, size=10)
+    print_daemon(daemoninfo, path= LOCAL_DAEMON_PATH,local=True, size=10)
     
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Sizes
@@ -557,6 +577,8 @@ else:
 
 if ssh_method=='password':
     print '-- Password (slow) | checked=true'
+    print '---- This method will manually ssh to your sever'
+    print '---- and run the docker commands at the prompt'
     print '---- Set IP | bash=' + ME_PATH + ' param1=-ip param2=null terminal=false refresh=true'
     print '------', ip
     print '---- Set username | bash=' + ME_PATH + ' param1=-user param2=null terminal=false refresh=true'
@@ -572,6 +594,8 @@ else:
 
 if ssh_method == 'passwordless':
     print '-- SSH Keys (fast) | checked=true'
+    print '---- For this to work, you must have passwordless'
+    print '---- ssh access to your remote docker server already setup'
     print '---- Set IP | bash=' + ME_PATH + ' param1=-ip param2=null terminal=false refresh=true'
     print '------', ip
     print '---- Set username | bash=' + ME_PATH + ' param1=-user param2=null terminal=false refresh=true'
@@ -658,7 +682,7 @@ if ssh_method=='password':
     #-----------------------------------------------------------------------------------------------------------
     daemoninfo = ''
     daemon_output=run_remote_cmd('cat '+ daemon, child)
-    print_daemon(daemon_output, local=False)
+    print_daemon(daemon_output, path=daemon, local=False)
 
     #-----------------------------------------------------------------------------------------------------------
     # Get Sizes (omitted because it takes too long)
@@ -691,11 +715,11 @@ elif ssh_method=='passwordless':
     print_info(dockerinfo_output, local=True, size=10)
     
     #-----------------------------------------------------------------------------------------------------------
-    # Get Remote Docker Daemon (if any, and use local processing)
+    # Get Remote Docker Daemon (if any)
     #-----------------------------------------------------------------------------------------------------------
     daemoninfo = ''
     daemoninfo = run_script(sshcommand + ' "test -f ' + daemon + ' && cat ' + daemon + '"')
-    print_daemon(daemoninfo, local=False, size=10)
+    print_daemon(daemoninfo, path=daemon, local=False, size=10)
     #-----------------------------------------------------------------------------------------------------------
     # Get Sizes (omitted because it takes too long)
     #-----------------------------------------------------------------------------------------------------------
