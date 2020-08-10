@@ -71,7 +71,6 @@ class c:
     GREY = '\033[1m'
     UNDERLINE = '\033[4m'
     
-    
 if os.path.isfile(local_path) :
     with open(local_path, 'r') as file:
         tmp = file.read()
@@ -297,7 +296,9 @@ def print_info(input_mystring, local=True, size=11):
 def print_daemon(input_mystring, path=None, local=True, size=11):
     print '-- ',c.WHITE,'{}'.format('    ⚙️ daemon.json'),c.END
     print "---- Using path: {} | color=gray".format(path)
-    if local==False:
+    if local:
+        print "------ Reveal in Finder | color=30C102 bash=" + ME_PATH +  " param1=-reveal param2={} terminal=false refresh=true".format(path)
+    else:
         if path == REMOTE_DAEMON_PATH:
             print "---- Set custom daemon.json path | color=#30C102 bash=" + ME_PATH +  " param1=-dpath param2=null terminal=false refresh=true"
         else:
@@ -321,7 +322,7 @@ def print_size(input_mystring, local=True, size=8):
         print '-- ',c.WHITE,'{}'.format('    📏 Sizes'),c.END
         for line in input_mystring.splitlines():
             tmp = repr(line)
-            if  'space usage:' in line:
+            if  'usage:' in line:
                 print("---- "+ tmp + "| color=#30C102 size=8 font='Courier New'")
             elif  'SIZE' in line:
                 print("---- "+ tmp + "| color=yellow size=8 font='Courier New'")
@@ -356,6 +357,7 @@ parser.add_argument('-ip', action='store', dest='lip',help='Remote IP Address')
 parser.add_argument('-user', action='store', dest='luser',help='Remote Username')
 parser.add_argument('-passwd', action='store', dest='lpasswd',help='Remote Password')
 parser.add_argument('-dpath', action='store', dest='lpath',help='Set Remote daemon.json Path')
+parser.add_argument('-reveal', action='store', dest='lreveal',help='Reveal daemon.json File In Finder')
 parser.add_argument('-ssh_method', action='store', dest='lssh_method',help='Use pexpect with password (slow) or public/private keypair for ssh (fast)')
 
 ssh_addon = SSH.replace("<user>",user).replace("<ip>",ip)
@@ -500,6 +502,12 @@ if(len(sys.argv) >= 2):
         with open(ssh_method_path, 'w') as f:
                 f.write(ssh_method)
         sys.exit(0)
+
+    elif(sys.argv[1] == '-reveal'):   
+        cmd = 'open -R {}'.format(sys.argv[2])
+        if os.path.isfile(sys.argv[2]):
+            run_script(cmd)
+        sys.exit(0)
         
 #print '🐳'
 #print '| image={}'.format(moby_icon)
@@ -510,6 +518,8 @@ print '---'
 
 if local_enabled:
     print "🏠 Local Docker |  color=#30C102 bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true" 
+    print "-- Click to disable |  color=red bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true" 
+    
     #print '---'
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Docker Containers
@@ -549,6 +559,7 @@ if local_enabled:
     
 else:
     print "🏠 Local Docker | color=gray bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true"
+    print "-- Click to enable | color=#30C102 bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true" 
 print '---'
 
 #-----------------------------------------------------------------------------------------------------------
@@ -564,8 +575,10 @@ print '---'
 #remote_enabled=False
 if remote_enabled:
     print "☁️ Remote Docker | color=#30C102  bash=" + ME_PATH +  " param1=-remote param2=null terminal=false refresh=true" + c.END
+    print "-- Click to disable | color=red bash=" + ME_PATH +  " param1=-remote param2=null terminal=false refresh=true" + c.END
 else:
     print "☁️ Remote Docker | color=gray bash=" + ME_PATH +  " param1=-remote param2=null terminal=false refresh=true" + c.END
+    print "-- Click to enable | color=#30C102 bash=" + ME_PATH +  " param1=-remote param2=null terminal=false refresh=true" + c.END
     print_refresh()
     sys.exit(0)
 
@@ -585,7 +598,7 @@ if ssh_method=='password':
         sys.exit(0)
 else:
     print '-- Password (slow) | bash=' + ME_PATH + ' param1=-ssh_method param2=password terminal=false refresh=true'
-    print '---- Click to enable | bash=' + ME_PATH + ' param1=-ssh_method param2=password terminal=false refresh=true'
+    print '---- Click to enable | color=#30C102 bash=' + ME_PATH + ' param1=-ssh_method param2=password terminal=false refresh=true'
     print '---- This method will manually ssh to your sever'
     print '---- and run the docker commands at the prompt'
 
@@ -604,7 +617,7 @@ if ssh_method == 'passwordless':
     
 else:
     print '-- SSH Keys (fast) | bash=' + ME_PATH + ' param1=-ssh_method param2=passwordless terminal=false refresh=true'
-    print '---- Click to enable | bash=' + ME_PATH + ' param1=-ssh_method param2=passwordless terminal=false refresh=true'
+    print '---- Click to enable | color=#30C102 bash=' + ME_PATH + ' param1=-ssh_method param2=passwordless terminal=false refresh=true'
     print '---- For this to work, you must have passwordless'
     print '---- ssh access to your remote docker server already setup'
 
