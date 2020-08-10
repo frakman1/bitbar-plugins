@@ -176,10 +176,10 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
     del dockerps_images[:]
     if local:
         print c.WHITE,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK + ' | wc -l | xargs') + ']' + c.END)),c.END
-        print '--',c.WHITE,'{:<13s}'.format('CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:<20s}'.format('SIZE'),c.END," | size={} font='Courier New'".format(size)
+        print '--',c.WHITE,'{:<13s}'.format('CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:>20s}'.format('SIZE                '),c.END," | size={} font='Courier New'".format(size)
     elif ssh=='passwordless':
         print c.WHITE,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l | xargs') + ']' + c.END)),c.END        
-        print '--',c.WHITE,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:<20s}'.format('    NAME'),c.END," | size={} font='Courier New'".format(size)
+        print '--',c.WHITE,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," | size={} font='Courier New'".format(size)
     else: #pexpect (ssh+password)
         cmd_output = run_remote_cmd(DOCKERPS_QUICK + ' | wc -l | xargs', child)
         for line in cmd_output.splitlines():
@@ -187,7 +187,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             if num:
                 break
         print c.WHITE+'{}'.format('    📦 Containers {}'.format(c.GREEN +str(num)+c.END))+c.END
-        print '--',c.WHITE,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:<20s}'.format('    NAME'),c.END," | size={} font='Courier New'".format(size)
+        print '--',c.WHITE,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," | size={} font='Courier New'".format(size)
     for i, line in enumerate(input_mystring.splitlines()):
         if '--format' in line or '{{' in line :
             continue
@@ -196,11 +196,11 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             continue
         if local or ssh=='passwordless':
             if ssh=='passwordless':
-                mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+                mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
                 get_img_id =DOCKER_GETIMGID.replace('inspect','-H ssh://'+user+'@'+ip+':22 inspect') + split_line[0]
                 
             else:
-                mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<25s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<21s}'.format(split_line[4])+c.CYAN+'{:<20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
+                mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<25s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<21s}'.format(split_line[4])+c.CYAN+'{:>20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
                 get_img_id = DOCKER_GETIMGID + split_line[0]
             display(mystring)
             output = run_script(get_img_id)
@@ -208,7 +208,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             image_id = tmp[0:12]
             dockerps_images.append(image_id)
         else:
-            mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+            mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
             display(mystring)
         #print 'inspect_cmd:',inspect_cmd
         if local or ssh=='passwordless':
@@ -268,14 +268,14 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
             if num:
                 break
         print c.WHITE,'{}'.format('    🖼️ Images ({})'.format(c.GREEN +str(num)+c.END)),c.END
-    print '-- ',c.WHITE,'{:<45s}'.format('REPOSITORY'),c.WHITE,'{:<15s}'.format('TAG'),c.WHITE,'{:<15s}'.format('ID'),c.WHITE,'{:<15s}'.format('CREATED'),c.WHITE,'{:<10s}'.format('SIZE'),c.END," | size={} font='Courier New'".format(size)
+    print '-- ',c.WHITE,'{:<45s}'.format('REPOSITORY'),'{:<15s}'.format('TAG'),'{:<15s}'.format('ID'),'{:<15s}'.format('CREATED'),'{:>10s}'.format('SIZE        '),c.END," | size={} font='Courier New'".format(size)
     for line in input_mystring.splitlines():
         if '--format' in line or '{{' in line :
             continue
         split_line = line.split("^^")
         if len(split_line) < 5:
             continue
-        mystring = '-- '+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:<10s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+        mystring = '-- '+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:>10s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
         display(mystring)
         #print '-- ',c.BLUE,'{:<45s}'.format(split_line[0]),c.RED,'{:<15s}'.format(split_line[1]),c.YELLOW,'{:<15s}'.format(split_line[2]),c.MAGENTA,'{:<15s}'.format(split_line[3]),c.GREEN,'{:<10s}'.format(split_line[4]),c.END," | size={} font='Courier New'".format(size)
         if local or ssh=='passwordless':
