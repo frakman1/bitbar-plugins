@@ -2,6 +2,8 @@
 # -*- encoding: utf-8 -*-
 
 import os, sys
+reload(sys)
+sys.setdefaultencoding('utf8')
 import argparse
 import subprocess
 from subprocess import check_output
@@ -12,6 +14,7 @@ import logging
 #import yaml
 import string
 import time
+from pipes import quote
 
 ME_PATH = os.path.realpath(__file__)
 
@@ -144,6 +147,9 @@ class OSXApp():
     def inform(self, title, message):
         self._message(title, message, 'buttons {"OK"}')
 
+    def inform_wide(self, title, message):
+        self._message(title, message, 'buttons {"                                                                                                                                                                OK                                                                                                                                                                "}')
+
     def ask_ok(self, title, message):
         # The extra space in "Cancel " is to prevent osascript from
         # seeing it as a cancel button. Otherwise clicking it would
@@ -162,6 +168,7 @@ class OSXApp():
         return self._message(title, message, 'buttons {\"%s\", \"%s\"} default button \"%s\" cancel button \"%s\" with icon stop'%(n,y,n,n))
         
     def _message(self, title, message, *more):
+        #if title != 'Result':
         message = message.replace('"', u'\u201C').replace("'", u'\u2018')
         if sys.version_info[0] == 2:
             message = message.encode('utf-8')
@@ -220,6 +227,10 @@ def run_input_script(script):
     stdout,stderr = (subprocess.Popen([script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate())
     return (stdout.strip(),stderr.strip())
 
+def run_input_script2(script):
+    stdout,stderr = (subprocess.Popen(script, stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate())
+    return (stdout.strip(),stderr.strip())
+
 
 @timing_decorator
 def print_containers(input_mystring, local=True, size=8, sess=None, ssh='password'):
@@ -250,19 +261,26 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         if local or ssh=='passwordless':
             if ssh=='passwordless':
                 mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.END+c.YELLOW+'{:<31s}'.format(split_line[1])+c.END+c.RED+'{:<22s}'.format(split_line[2])+c.END+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.END+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
-                get_img_id =DOCKER_GETIMGID.replace('inspect','-H ssh://'+user+'@'+ip+':22 inspect') + split_line[0]
+                #get_img_id =DOCKER_GETIMGID.replace('inspect','-H ssh://'+user+'@'+ip+':22 inspect') + split_line[0]
                 
             else:
                 mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<25s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<21s}'.format(split_line[4])+c.CYAN+'{:>20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
-                get_img_id = DOCKER_GETIMGID + split_line[0]
+                #get_img_id = DOCKER_GETIMGID + split_line[0]
             display(mystring)
-            output = run_script(get_img_id)
-            tmp = output[output.index(':')+1:]
-            image_id = tmp[0:12]
-            dockerps_images.append(image_id)
+            #output = run_script(get_img_id)     #e.g. sha256:bf756fb1ae65adf866bd8c456593cd24beb6a0a061dedf42b26a993176745f6b
+            #tmp = output[output.index(':')+1:]  
+            #image_id = tmp[0:12]
+            #dockerps_images.append(image_id)
         else:
             mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
             display(mystring)
+        if split_line[1] not in dockerps_images:
+            if ':' not in split_line[1]:
+                toadd = (split_line[1]+':latest')
+            else:
+                toadd = (split_line[1])
+            if toadd not in dockerps_images:
+                dockerps_images.append(toadd)
         #print 'inspect_cmd:',inspect_cmd
         if local or ssh=='passwordless':
             if ssh=='passwordless':
@@ -291,6 +309,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         
         #print "---- 🪵 Log"
         print "---- 📔 Log"
+        #print "---- Log| image={}".format(log_icon2)
         for log_line in log_output.splitlines():
             mystring = "------ " + repr(log_line) + " | size=10 font='Courier New'"
             display(mystring)
@@ -298,7 +317,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         
         if local or ssh=='passwordless':            
             if 'Up' in split_line[3]:
-                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-s param2={} param3={} terminal=false refresh=true".format(split_line[0],local)
+                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-s param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
                 print "---- ↩️ Enter | none"+c.END
                 print "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-b1 param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
                 print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-b2 param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
@@ -345,12 +364,12 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
                         #print "Error parsing portlist: {}".format(e)
                         pass                        
  
-                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} param3={} terminal=false refresh=true".format(split_line[0],local)
+                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
         
             #if 'Exited' in split_line[3] or 'Created' in split_line[3]:
             else:
-                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-t param2={} param3={} terminal=false refresh=true".format(split_line[0],local)
-                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-r param2={} param3={} terminal=false refresh=true".format(split_line[0],local)
+                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-t param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
+                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-r param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
 
 @timing_decorator          
 def print_images(input_mystring, local=True, size=8, ssh='password'):
@@ -378,14 +397,14 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
         display(mystring)
         #print '-- ',c.BLUE,'{:<45s}'.format(split_line[0]),c.RED,'{:<15s}'.format(split_line[1]),c.YELLOW,'{:<15s}'.format(split_line[2]),c.MAGENTA,'{:<15s}'.format(split_line[3]),c.GREEN,'{:<10s}'.format(split_line[4]),c.END," | size={} font='Courier New'".format(size)
         if local or ssh=='passwordless':
-            if split_line[2] not in dockerps_images:    # if this image is not used by a container
-                print "---- 🗑️ Remove | bash=" + ME_PATH +  " param1=-rmi param2={}  param3={} terminal=false refresh=true".format(split_line[2], local)
+            if (split_line[0]+':'+split_line[1]) not in dockerps_images:    # if this image is not used by a container
+                print "---- 🗑️ Remove | bash=" + ME_PATH +  " param1=-rmi param2={} param3={} param4={} terminal=false refresh=true".format(split_line[2],local,split_line[0])
             else:
-                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmif param2={}  param3={} terminal=false refresh=true".format(split_line[2],local)
+                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmif param2={} param3={} param4={} terminal=false refresh=true".format(split_line[2],local,split_line[0])
 
 @timing_decorator    
 def print_info(input_mystring, local=True, size=11):
-    print '-- ',c.END,'{}'.format('    ℹ️ Docker Info'),c.END
+    print '-- ℹ️ Docker Info'
 
     for info_line in input_mystring.splitlines():
         mystring = "---- "  + '‎‎' + info_line + " |   size=11 font='Courier New'"+c.END
@@ -394,7 +413,7 @@ def print_info(input_mystring, local=True, size=11):
 
 @timing_decorator
 def print_daemon(input_mystring, path=None, local=True, size=11):
-    print '-- ',c.END,'{}'.format('    ⚙️ daemon.json'),c.END
+    print '-- ⚙️ daemon.json'
     print "---- Using path: {} | color=gray".format(path)
     if local:
         print "------ Reveal in Finder | color=#30C102 bash=" + ME_PATH +  " param1=-reveal param2={} terminal=false refresh=true".format(path)
@@ -419,7 +438,7 @@ def print_daemon(input_mystring, path=None, local=True, size=11):
 @timing_decorator
 def print_size(input_mystring, local=True, size=8):
     if input_mystring:
-        print '-- ',c.END,'{}'.format('    📏 Sizes'),c.END
+        print '-- 📏 Sizes'
         for line in input_mystring.splitlines():
             tmp = repr(line)
             if  'usage:' in line:
@@ -439,6 +458,7 @@ def print_refresh():
     print(''.join(["Elapsed Time: ",str(end - start).split('.')[0]]))    
     print "---"                   
     sys.exit(0)
+    
 #-----------------------------------------------------------------------------------------------------------
 # Handle Inputs
 #-----------------------------------------------------------------------------------------------------------
@@ -460,6 +480,7 @@ parser.add_argument('-dpath', action='store', dest='lpath',help='Set Remote daem
 parser.add_argument('-reveal', action='store', dest='lreveal',help='Reveal daemon.json File In Finder')
 parser.add_argument('-ssh_method', action='store', dest='lssh_method',help='Use pexpect with password (slow) or public/private keypair for ssh (fast)')
 parser.add_argument('-web', action='store', dest='lweb',help='Open in web browser')
+parser.add_argument('-custom', action='store', dest='lcustom',help='Run a custom Docker command')
 
 ssh_addon = SSH.replace("<user>",user).replace("<ip>",ip)
 
@@ -470,9 +491,11 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + ssh_addon + " stop " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " stop " + sys.argv[2]
-        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to do this? This will run:\n\n {}".format(cmd))
+        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to STOP container '{}'? This will run:\n\n {}".format(sys.argv[4],cmd))
         if 'Yes' in prompt:    
-            run_script(cmd)
+            (stdo,stde)=run_input_script(cmd)
+            OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
+            
         sys.exit(0)     
 
     elif(sys.argv[1] == '-t'):   
@@ -482,9 +505,10 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + ssh_addon + " start " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " start " + sys.argv[2]
-        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to do this? This will run:\n\n {}".format(cmd))
+        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to START container '{}'? This will run:\n\n {}".format(sys.argv[4],cmd))
         if 'Yes' in prompt:    
-            run_script(cmd)
+            (stdo,stde)=run_input_script(cmd)
+            OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
         sys.exit(0)    
     
     elif(sys.argv[1] == '-r'):  
@@ -493,9 +517,10 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + ssh_addon + " rm " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " rm " + sys.argv[2]
-        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to do this? This will run:\n\n {}".format(cmd))
+        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to REMOVE container '{}'? This will run:\n\n {}".format(sys.argv[4],cmd))
         if 'Yes' in prompt:    
-           run_script(cmd)
+            (stdo,stde)=run_input_script(cmd)
+            OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
         sys.exit(0)    
 
     elif(sys.argv[1] == '-rmf'):   
@@ -503,9 +528,10 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + ssh_addon + " rm -f " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " rm -f " + sys.argv[2]
-        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to do this? This will run:\n\n {}".format(cmd))
+        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to FORCE REMOVE container '{}'? This will run:\n\n {}".format(sys.argv[4],cmd))
         if 'Yes' in prompt:    
-            run_script(cmd)
+            (stdo,stde)=run_input_script(cmd)
+            OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
         sys.exit(0)  
 
     elif(sys.argv[1] == '-b1'):
@@ -531,9 +557,10 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + ssh_addon + " rmi " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " rmi " + sys.argv[2]
-        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to do this? This will run:\n\n {}".format(cmd))
+        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to REMOVE image '{}'? This will run:\n\n {}".format(sys.argv[4],cmd))
         if 'Yes' in prompt:    
-            run_script(cmd)
+            (stdo,stde)=run_input_script(cmd)
+            OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
         sys.exit(0)  
 
     elif(sys.argv[1] == '-rmif'):   
@@ -541,9 +568,10 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + ssh_addon + " rmi -f " + sys.argv[2]
         else:
             cmd = DOCKER_PATH + " rmi -f " + sys.argv[2]
-        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to do this? This will run:\n\n {}".format(cmd))
+        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to FORCE REMOVE image '{}'? This will run:\n\n {}".format(sys.argv[4],cmd))
         if 'Yes' in prompt:    
-            run_script(cmd)
+            (stdo,stde)=run_input_script(cmd)
+            OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
         sys.exit(0)  
 
     elif(sys.argv[1] == '-local'):   
@@ -624,6 +652,26 @@ if(len(sys.argv) >= 2):
         run_script(cmd)
         sys.exit(0)
         
+    elif(sys.argv[1] == '-custom'):   
+        cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter The docker command you wish to run locally." + "  \" with icon note default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
+        (stdo,stde)=run_input_script(cmd)
+        cmd2 = stdo.split(" ")
+        if cmd2[0] != 'docker':
+            OSXApp().fail("ERROR", "Invalid Docker Command")
+            print_refresh()
+        prompt = OSXApp().ask_yesno("Confirmation Required", "You entered:\n\n{}\n{}\n\nDo you wish to continue?".format(stdo,stde))
+        if 'Yes' in prompt:    
+            if sys.argv[2]=='local':
+                print 'LOCAL'
+                out = check_output(cmd2)
+            elif sys.argv[2]=='remote' and ssh_method=='passwordless':
+                print 'REMOTE'
+                cmd2.insert(1,''.join((arg) for arg in ssh_addon.strip()))
+                print cmd2
+                out = check_output(cmd2)
+            OSXApp().inform_wide("Result", "Script returned:\n\n{}".format(out))
+        sys.exit(0)
+
 #print '🐳'
 #print '| image={}'.format(moby_icon)
 #print '| image={}'.format(log_icon2)
@@ -670,6 +718,11 @@ if local_enabled:
     #-----------------------------------------------------------------------------------------------------------
     dockerdf_output=run_script(DOCKER_PATH + ' system df -v')
     print_size(dockerdf_output)
+
+    #-----------------------------------------------------------------------------------------------------------
+    # Custom Commands
+    #-----------------------------------------------------------------------------------------------------------
+    print "-- ⌨️ Custom | bash=" + ME_PATH +  " param1=-custom param2=local terminal=false refresh=true" 
     
     
 else:
@@ -737,9 +790,10 @@ if ssh_method == 'passwordless':
 else:
     print '-- SSH Keys (fast) | bash=' + ME_PATH + ' param1=-ssh_method param2=passwordless terminal=false refresh=true'
     print '---- Click to enable | color=#30C102 bash=' + ME_PATH + ' param1=-ssh_method param2=passwordless terminal=false refresh=true'
-    print '---- For this to work, you must have passwordless'
-    print '---- ssh access to your remote docker server already setup'
-
+    print '---- In order for this to work, you must have passwordless'
+    print '---- SSH access to your remote Docker Server already setup'
+    print '---- You do this by adding your public key to the "authorized_keys"'
+    print '---- file on your server (e.g. /root/.ssh/authorized_keys)'
 
 
 
@@ -751,8 +805,7 @@ else:
 # SSH To Remote Server
 #-----------------------------------------------------------------------------------------------------------
 
-SSH_CMD_PWD = 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o PubkeyAuthentication=no {}'.format(user)
-SSH_CMD_NOPWD = 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=ERROR {}'.format(user)
+SSH_CMD_PWD = 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o LogLevel=ERROR {}'.format(user)
 
 if ssh_method=='password':
     import pexpect
@@ -767,8 +820,9 @@ if ssh_method=='password':
     i = child.expect([pexpect.TIMEOUT, '.*assword:', '.*refused', pexpect.EOF])
     #print('i is: {}'.format(i))
     if i != 1:
-        print ('ERROR! SSH Failed:', ip)
-        sys.exit(0)
+        #print ('ERROR! SSH Failed:', ip)
+        OSXApp().fail("ERROR", "SSH Failed.\n{}\n{}".format(child.before,child.after))
+        print_refresh()
     child.delaybeforesend = 1
     child.sendline(passwd)
     child.sendline('')
@@ -777,13 +831,16 @@ if ssh_method=='password':
     #print('ssh i is: {}'.format(i))
     if i == 0:
         #print(child, 'ERROR! SSH timed out:', ip)
-        sys.exit(0)
+        OSXApp().fail("ERROR", "SSH timed out.\n{}\n{}".format(child.before,child.after))
+        print_refresh()
     elif i == 1:
         #print(child, 'ERROR! Incorrect password:', ip)
-        sys.exit(0)
+        OSXApp().fail("ERROR", "SSH Failed. Permission denied.\n{}\n{}".format(child.before,child.after))
+        print_refresh()
     elif i == 2:
         #print(child, 'ERROR! Connection Closed:', ip)
-        sys.exit(0)
+        OSXApp().fail("ERROR", "SSH Failed. Connection Closed")
+        print_refresh()
     result = child.before.decode('utf-8', 'ignore')
     #print('result',result)
     #print child
@@ -828,6 +885,8 @@ if ssh_method=='password':
     child.close()
     
 elif ssh_method=='passwordless':
+    SSH_CMD_NOPWD = 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=ERROR {}'.format(user)
+    
     sshcommand = SSH_CMD_NOPWD+'@{}'.format(ip) + ' '
     #-----------------------------------------------------------------------------------------------------------
     # Get Remote Docker Containers (SSH)
@@ -861,6 +920,10 @@ elif ssh_method=='passwordless':
     #dockerdf_output=run_script(sshcommand + DOCKER_PATH + ' "system df -v"')
     #print_size(dockerdf_output)
 
+    #-----------------------------------------------------------------------------------------------------------
+    # Custom Commands
+    #-----------------------------------------------------------------------------------------------------------
+    print "-- ⌨️ Custom | bash=" + ME_PATH +  " param1=-custom param2=remote terminal=false refresh=true" 
 
 print_refresh()
 
