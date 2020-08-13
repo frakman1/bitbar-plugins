@@ -318,12 +318,13 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             display(mystring)
         
         
-        if local or ssh=='passwordless':            
+        if local or ssh=='passwordless':
+            print "---- 🔄 Restart | bash=" + ME_PATH +  " param1=-restart param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
             if 'Up' in split_line[3]:
-                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-s param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
+                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-stop param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
                 print "---- ↩️ Enter | none"+c.END
-                print "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-b1 param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
-                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-b2 param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
+                print "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-bash param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
+                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-shell param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
                 print "------ 🌐 web " 
                 
                 #sometimes, the Ports list is not populated so you have to look into the 'inspect' data to sniff out some ports.
@@ -371,8 +372,8 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         
             #if 'Exited' in split_line[3] or 'Created' in split_line[3]:
             else:
-                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-t param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
-                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-r param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
+                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-start param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
+                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-remove param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
 
 @timing_decorator          
 def print_images(input_mystring, local=True, size=8, ssh='password'):
@@ -462,12 +463,13 @@ def print_refresh():
 # Handle Inputs
 #-----------------------------------------------------------------------------------------------------------
 parser = argparse.ArgumentParser()
-parser.add_argument('-s', action='store', dest='lstop',help='Stop Running Container')
-parser.add_argument('-t', action='store', dest='lstart',help='Start A Stopped Container')
-parser.add_argument('-r', action='store', dest='lremove',help='Remove A Stopped Container')
+parser.add_argument('-stop', action='store', dest='lstop',help='Stop Running Container')
+parser.add_argument('-start', action='store', dest='lstart',help='Start A Stopped Container')
+parser.add_argument('-restart', action='store', dest='lstart',help='Restart A Container')
+parser.add_argument('-remove', action='store', dest='lremove',help='Remove A Stopped Container')
 parser.add_argument('-rmf', action='store', dest='lforceremove',help='Force Remove A Running Container')
-parser.add_argument('-b1', action='store', dest='lbash',help='Bash Into A Running Container')
-parser.add_argument('-b2', action='store', dest='lsh',help='Sh Into A Running Container')
+parser.add_argument('-bash', action='store', dest='lbash',help='Bash Into A Running Container')
+parser.add_argument('-shell', action='store', dest='lsh',help='Sh Into A Running Container')
 parser.add_argument('-rmi', action='store', dest='lremoveimage',help='Remove An Image')
 parser.add_argument('-rmif', action='store', dest='lforceremoveimage',help='Force Remove An Image')
 parser.add_argument('-local', action='store', dest='llocal',help='Toggle Local Server Support')
@@ -485,8 +487,8 @@ parser.add_argument('-follow', action='store', dest='lfollow',help='Follow the l
 ssh_addon = SSH.replace("<user>",user).replace("<ip>",ip)
 
 if(len(sys.argv) >= 2):
-    if(sys.argv[1] == '-s'):
-        print 'ssh_method:',ssh_method,'local',sys.argv[3] 
+    if(sys.argv[1] == '-stop'):
+        #print 'ssh_method:',ssh_method,'local',sys.argv[3] 
         if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " stop " + sys.argv[2]
         else:
@@ -498,9 +500,9 @@ if(len(sys.argv) >= 2):
             
         sys.exit(0)     
 
-    elif(sys.argv[1] == '-t'):   
-        print sys.argv
-        print 'ssh_method:',ssh_method,'local',sys.argv[3]    
+    elif(sys.argv[1] == '-start'):   
+        #print sys.argv
+        #print 'ssh_method:',ssh_method,'local',sys.argv[3]    
         if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " start " + sys.argv[2]
         else:
@@ -510,9 +512,22 @@ if(len(sys.argv) >= 2):
             (stdo,stde)=run_input_script(cmd)
             OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
         sys.exit(0)    
+
+    elif(sys.argv[1] == '-restart'):   
+        #print sys.argv
+        #print 'ssh_method:',ssh_method,'local',sys.argv[3]    
+        if ssh_method=='passwordless' and sys.argv[3]=='False':
+            cmd = DOCKER_PATH + ssh_addon + " restart " + sys.argv[2]
+        else:
+            cmd = DOCKER_PATH + " restart " + sys.argv[2]
+        prompt = OSXApp().ask_yesno2("Confirmation Required", "Are you sure you want to RESTART container '{}'? This will run:\n\n {}".format(sys.argv[4],cmd))
+        if 'Yes' in prompt:    
+            (stdo,stde)=run_input_script(cmd)
+            OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
+        sys.exit(0)  
     
-    elif(sys.argv[1] == '-r'):  
-        print 'ssh_method:',ssh_method   
+    elif(sys.argv[1] == '-remove'):  
+        #print 'ssh_method:',ssh_method   
         if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " rm " + sys.argv[2]
         else:
@@ -534,7 +549,7 @@ if(len(sys.argv) >= 2):
             OSXApp().inform("Result", "Script returned:\n\n{}\n{}".format(stdo,stde))
         sys.exit(0)  
 
-    elif(sys.argv[1] == '-b1'):
+    elif(sys.argv[1] == '-bash'):
         if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " exec -it " + sys.argv[2] + " /bin/bash"
         else:
@@ -543,7 +558,7 @@ if(len(sys.argv) >= 2):
         os.system('echo "Running: {}";{}'.format(cmd,cmd))
         sys.exit(0)     
 
-    elif(sys.argv[1] =='-b2'):
+    elif(sys.argv[1] =='-shell'):
         if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " exec -it " + sys.argv[2] + " /bin/sh"
         else:
