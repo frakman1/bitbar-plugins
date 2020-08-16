@@ -1,6 +1,14 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
 
+# <bitbar.title>DockerInfo</bitbar.title>
+# <bitbar.author>Frak Nuaimy</bitbar.author>
+# <bitbar.author.github>frakman1</bitbar.author.github>
+# <bitbar.image>https://i.imgur.com/xoztllr.png</bitbar.image>
+# <bitbar.desc>Manage your Local and Remote docker server</bitbar.desc>
+# <bitbar.dependencies>python,pexpect</bitbar.dependencies>
+# <bitbar.version>v1.0</bitbar.version>
+
 import os, sys
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -184,7 +192,6 @@ class OSXApp():
 
 @timing_decorator
 def run_remote_cmd(script, sess, timeout=0.5):
-    #print 'sess script:',script
     sess.expect (r'.+')  # This clears it from previous command output
     sess.echo=None
     sess.logfile_send = None
@@ -193,20 +200,11 @@ def run_remote_cmd(script, sess, timeout=0.5):
     while retry > 0:
         retry -= 1
         i = sess.expect ([pexpect.TIMEOUT, pexpect.EOF], timeout=timeout)
-        #i = sess.expect ([LOCAL_PROMPT,pexpect.TIMEOUT, pexpect.EOF], timeout=60)
-        #print('retry:{} script i is: {}'.format(retry,i))
-        #print('before:{}'.format(sess.before))
-        #print('after:{}'.format(sess.after))
+
         if i==0:
-            #print('sess.before=%s' % (sess.before))
             if re.search(LOCAL_PROMPT, sess.before): #check for success mystring
-                #print(c.GREEN + 'Data is in Before.' + c.END)
                 return sess.before
             if sess.before:
-                #return sess.after
-                #print(c.GREEN + 'Data is in After.' + c.END)
-                #print'in sess.before'
-                #sess.expect (r'.+')
                 continue
         else:
             break
@@ -217,13 +215,7 @@ def run_remote_cmd(script, sess, timeout=0.5):
 @timing_decorator
 def run_script(script):
     return (subprocess.Popen([script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate()[0].strip())
-    '''
-    p1 = subprocess.Popen([script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True)
-    p2 = subprocess.Popen(["/usr/local/bin/ansifilter"], stdin=p1.stdout, stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True)
-    p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
-    output = p2.communicate()[0].strip()
-    return output
-    '''
+
 def run_input_script(script):
     stdout,stderr = (subprocess.Popen([script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, universal_newlines=True).communicate())
     return (stdout.strip(),stderr.strip())
@@ -252,8 +244,6 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         print c.END+'{}'.format('    📦 Containers {}'.format(c.GREEN +str(num)+c.END))+c.END
         print '--',c.END,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," |  size={} font='Courier New'".format(size)
     for i, line in enumerate(input_mystring.splitlines()):
-        #if i==1:
-            #exit(0)
         if '--format' in line or '{{' in line :
             continue
         split_line = line.split("^^")
@@ -419,7 +409,6 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
                 break
         print c.END,'{}'.format('    🖼️ Images ({})'.format(c.GREEN +str(num)+c.END)),c.END
     print '-- ',c.END,'{:<45s}'.format('  REPOSITORY'),'{:<15s}'.format('  TAG'),'{:<15s}'.format('ID'),'{:<15s}'.format('CREATED'),'{:>10s}'.format('SIZE   '),c.END," |  size={} font='Courier New'".format(size)
-    #for line in input_mystring.splitlines():
     for i, line in enumerate(input_mystring.splitlines()):        
         if '--format' in line or '{{' in line :
             continue
@@ -728,10 +717,9 @@ if(len(sys.argv) >= 2):
         os.system('echo "Running: {}";{}'.format(cmd,cmd))
         sys.exit(0)     
 
-
-#print '🐳'
-#print '| image={}'.format(moby_icon)
-#print '| image={}'.format(log_icon2)
+#-----------------------------------------------------------------------------------------------------------
+# START HERE
+#-----------------------------------------------------------------------------------------------------------
 print '| image={}'.format(moby_icon2)
 print '---'
 
@@ -740,7 +728,6 @@ if local_enabled:
     print "🏠 Local Docker |  color=#30C102 bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true" 
     print "-- Click to disable Local |  color=red bash=" + ME_PATH +  " param1=-local param2=null terminal=false refresh=true" 
     
-    #print '---'
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Docker Containers
     #-----------------------------------------------------------------------------------------------------------
@@ -862,14 +849,11 @@ if ssh_method=='password':
     import pexpect
     
     command = SSH_CMD_PWD+'@{}'.format(ip)
-    #logger.info('SSH to device.')
-    #logger.info('SSH command is: ' + c.CYAN + c.UNDERLINE + '{}'.format(command) + c.END)
     child = pexpect.spawn(command)
     child.logfile_read = None  #Set to logger to see the child output
     child.logfile_send = None  #Set to None to hide password
 
     i = child.expect([pexpect.TIMEOUT, '.*assword:', '.*refused', pexpect.EOF])
-    #print('i is: {}'.format(i))
     if i != 1:
         #print ('ERROR! SSH Failed:', ip)
         OSXApp().fail("ERROR", "SSH Failed.\n{}\n{}".format(child.before,child.after))
@@ -893,8 +877,6 @@ if ssh_method=='password':
         OSXApp().fail("ERROR", "SSH Failed. Connection Closed")
         print_refresh()
     result = child.before.decode('utf-8', 'ignore')
-    #print('result',result)
-    #print child
     print "---"
 
     
