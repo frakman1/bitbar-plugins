@@ -15,6 +15,7 @@ import logging
 import string
 import time
 from pipes import quote
+import urllib2
 
 ME_PATH = os.path.realpath(__file__)
 
@@ -63,10 +64,10 @@ daemon=REMOTE_DAEMON_PATH
 ssh_method='password'
 
 class c: 
+    BLACK = '\033[30m' 
     RED = '\033[31m' 
     GREEN = '\033[32m'
-    #YELLOW = '\033[33m'
-    YELLOW = '\033[0m'
+    YELLOW = '\033[33m'
     BLUE = '\033[34m'
     MAGENTA = '\033[35m'
     CYAN = '\033[36m'
@@ -238,7 +239,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
     del dockerps_images[:]
     if local:
         print c.END,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK + ' | wc -l | xargs') + ']' + c.END)),c.END
-        print '--',c.END,'{:<13s}'.format('CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:>20s}'.format('SIZE                '),c.END," | size={} font='Courier New'".format(size)
+        print '--',c.END,'{:<13s}'.format('  CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:>20s}'.format('SIZE                '),c.END," | size={} font='Courier New'".format(size)
     elif ssh=='passwordless':
         print c.END,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l | xargs') + ']' + c.END)),c.END        
         print '--',c.END,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," | size={} font='Courier New'".format(size)
@@ -260,14 +261,14 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             continue
         if local or ssh=='passwordless':
             if ssh=='passwordless':
-                mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.END+c.YELLOW+'{:<31s}'.format(split_line[1])+c.END+c.RED+'{:<22s}'.format(split_line[2])+c.END+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.END+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+                mystring = '--'+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.END+c.YELLOW+'{:<31s}'.format(split_line[1])+c.END+c.RED+'{:<22s}'.format(split_line[2])+c.END+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.END+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
                 
             else:
-                mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<25s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<21s}'.format(split_line[4])+c.CYAN+'{:>20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
+                mystring = '--'+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<20s}'.format(split_line[4])+c.CYAN+'{:>20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
             display(mystring)
 
         else:
-            mystring = '--'+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+            mystring = '--'+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
             display(mystring)
         if split_line[1] not in dockerps_images:
             if ':' not in split_line[1]:
@@ -357,17 +358,44 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
                     except Exception as e:
                         #print "Error parsing portlist: {}".format(e)
                         pass
-
+                
+                #print exports
+                
                 for p in exports:
+                    response = None
+                    web_true = False
+                    web_error = False
                     try:
                         if local:
-                            print "-------- http://" + "127.0.0.1" + ":" + p + " | href=http://{}:{}".format('127.0.0.1',p)
+                            hostname = '127.0.0.1'
                         else:
-                            print "-------- http://" + ip + ":" + p + " | href=http://{}:{}".format(ip,p)
+                            hostname = ip
+                        full_url = 'http://'+hostname+':'+p    
+                        try:
+                            response = urllib2.urlopen(full_url)
+                        except urllib2.URLError as e:
+                            if e.code != 200:
+                                web_error = True
+                        if response:  
+                            html = response.read()
+                            if '</html>' in  html:
+                                #print "Found website"
+                                web_true = True
+                                
+                        if local:
+                            if web_error:
+                                print "-------- ❗http://" + "127.0.0.1" + ":" + p + " | href=http://{}:{}".format('127.0.0.1',p)
+                            else:
+                                print "-------- http://" + "127.0.0.1" + ":" + p + " | href=http://{}:{}".format('127.0.0.1',p)
+                        else:
+                            if web_error:
+                                print "-------- ❗http://" + ip + ":" + p + " | href=http://{}:{}".format(ip,p)
+                            else:
+                                print "-------- http://" + ip + ":" + p + " | href=http://{}:{}".format(ip,p)
                     except Exception as e:
                         #print "Error parsing portlist: {}".format(e)
                         pass                        
- 
+                
                 print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
         
             #if 'Exited' in split_line[3] or 'Created' in split_line[3]:
@@ -390,14 +418,15 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
             if num:
                 break
         print c.END,'{}'.format('    🖼️ Images ({})'.format(c.GREEN +str(num)+c.END)),c.END
-    print '-- ',c.END,'{:<45s}'.format('REPOSITORY'),'{:<15s}'.format('TAG'),'{:<15s}'.format('ID'),'{:<15s}'.format('CREATED'),'{:>10s}'.format('SIZE        '),c.END," |  size={} font='Courier New'".format(size)
-    for line in input_mystring.splitlines():
+    print '-- ',c.END,'{:<45s}'.format('  REPOSITORY'),'{:<15s}'.format('  TAG'),'{:<15s}'.format('ID'),'{:<15s}'.format('CREATED'),'{:>10s}'.format('SIZE   '),c.END," |  size={} font='Courier New'".format(size)
+    #for line in input_mystring.splitlines():
+    for i, line in enumerate(input_mystring.splitlines()):        
         if '--format' in line or '{{' in line :
             continue
         split_line = line.split("^^")
         if len(split_line) < 5:
             continue
-        mystring = '-- '+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:>10s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+        mystring = '-- '+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:>10s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
         display(mystring)
         if local or ssh=='passwordless':
             if (split_line[0]+':'+split_line[1]) not in dockerps_images:    # if this image is not used by a container
