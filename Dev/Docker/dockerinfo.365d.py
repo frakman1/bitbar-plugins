@@ -125,7 +125,11 @@ def timing_decorator(func):
 
     return wrapper
 
-        
+def write_to_clipboard(output):
+    process = subprocess.Popen(
+        'pbcopy', env={'LANG': 'en_US.UTF-8'}, stdin=subprocess.PIPE)
+    process.communicate(output.encode('utf-8'))
+            
 def display(msg):
     sys.stdout.flush()
     print(msg)
@@ -234,7 +238,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         print '--',c.END,'{:<13s}'.format('  CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:>20s}'.format('SIZE                '),c.END," | size={} font='Courier New'".format(size)
     elif ssh=='passwordless':
         print c.END,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l | xargs') + ']' + c.END)),c.END        
-        print '--',c.END,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," | size={} font='Courier New'".format(size)
+        print '--',c.END,'{:<12s}'.format('  CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," | size={} font='Courier New'".format(size)
     else: #pexpect (ssh+password)
         cmd_output = run_remote_cmd(DOCKERPS_QUICK + ' | wc -l | xargs', child)
         for line in cmd_output.splitlines():
@@ -301,7 +305,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         
         #print "---- 🪵 Log"
         print "---- 📔 Log"
-        print "------  👣 Follow Log | color = green bash=" + ME_PATH +  " param1=-follow param2={} param3={} param4=null terminal=true refresh=true".format(split_line[0],local)
+        print "------  👣 Follow Log | color = green bash=" + ME_PATH +  " param1=-follow param2={} param3={} param4=null terminal=true refresh=false".format(split_line[0],local)
         
         #print "---- Log| image={}".format(log_icon2)
         for log_line in log_output.splitlines():
@@ -314,8 +318,8 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             if 'Up' in split_line[3]:
                 print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-stop param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
                 print "---- ↩️ Enter | none"+c.END
-                print "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-bash param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
-                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-shell param2={} param3={} terminal=true refresh=true".format(split_line[0],local)
+                print "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-bash param2={} param3={} terminal=true refresh=false".format(split_line[0],local)
+                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-shell param2={} param3={} terminal=true refresh=false".format(split_line[0],local)
                 print "------ 🌐 web " 
                 
                 #sometimes, the Ports list is not populated so you have to look into the 'inspect' data to sniff out some ports.
@@ -392,6 +396,10 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             else:
                 print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-start param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
                 print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-remove param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
+            print "---- 📋 Copy "
+            print "------ ID   |  bash=" + ME_PATH +  " param1=-copyid   param2={} param3=null param4=null terminal=false refresh=false".format(split_line[0])
+            print "------ Name |  bash=" + ME_PATH +  " param1=-copyname param2={} param3=null param4=null terminal=false refresh=false".format(split_line[4])
+            print "------ Line |  bash=" + ME_PATH +  " param1=-copyline param2={} param3=null param4=null terminal=false refresh=false".format(line[:line.rindex('^^')].replace('"','').replace(' ','_sp_'))
 
 @timing_decorator          
 def print_images(input_mystring, local=True, size=8, ssh='password'):
@@ -488,6 +496,9 @@ parser.add_argument('-remove', action='store', dest='lremove',help='Remove A Sto
 parser.add_argument('-rmf', action='store', dest='lforceremove',help='Force Remove A Running Container')
 parser.add_argument('-bash', action='store', dest='lbash',help='Bash Into A Running Container')
 parser.add_argument('-shell', action='store', dest='lsh',help='Sh Into A Running Container')
+parser.add_argument('-copyid', action='store', dest='lcpid',help='Copy Container ID to Clipboard')
+parser.add_argument('-copyname', action='store', dest='lcpname',help='Copy Container Name to Clipboard')
+parser.add_argument('-copyline', action='store', dest='lcpline',help='Copy Container Line to Clipboard')
 parser.add_argument('-rmi', action='store', dest='lremoveimage',help='Remove An Image')
 parser.add_argument('-rmif', action='store', dest='lforceremoveimage',help='Force Remove An Image')
 parser.add_argument('-local', action='store', dest='llocal',help='Toggle Local Server Support')
@@ -574,7 +585,7 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + " exec -it " + sys.argv[2] + " /bin/bash"
         #print cmd
         os.system('echo "Running: {}";{}'.format(cmd,cmd))
-        sys.exit(0)     
+        #sys.exit(0)     
 
     elif(sys.argv[1] =='-shell'):
         if ssh_method=='passwordless' and sys.argv[3]=='False':
@@ -583,8 +594,19 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + " exec -it " + sys.argv[2] + " /bin/sh"
         #print cmd
         os.system('echo "Running: {}";{}'.format(cmd,cmd))
-        sys.exit(0)       
+        #sys.exit(0)       
 
+    elif(sys.argv[1] =='-copyid'):
+        write_to_clipboard(sys.argv[2])
+        #sys.exit(0) 
+    elif(sys.argv[1] =='-copyname'):
+        write_to_clipboard(sys.argv[2])
+        #sys.exit(0) 
+    elif(sys.argv[1] =='-copyline'):
+        #OSXApp().inform("Result", "Script returned:\n\n{}".format(zstring))
+        write_to_clipboard((sys.argv[2]).replace('^^',"  ").replace('_sp_'," "))
+        #sys.exit(0) 
+        
     elif(sys.argv[1] == '-rmi'):   
         if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " rmi " + sys.argv[2]
@@ -683,7 +705,7 @@ if(len(sys.argv) >= 2):
     elif(sys.argv[1] == '-web'):   
         cmd = 'open http://{}:{}'.format(sys.argv[2],sys.argv[3])
         run_script(cmd)
-        sys.exit(0)
+        #sys.exit(0)
         
     elif(sys.argv[1] == '-custom'):   
         cmd = "osascript -e \'set theString to text returned of (display dialog \"Please Enter The docker command you wish to run on {}.".format(sys.argv[2]) + "  \" with icon note default answer \"\" buttons {\"OK\",\"Cancel\"} default button 1) \'" 
@@ -715,7 +737,7 @@ if(len(sys.argv) >= 2):
             cmd = DOCKER_PATH + " logs -t --follow " + sys.argv[2] 
         print cmd
         os.system('echo "Running: {}";{}'.format(cmd,cmd))
-        sys.exit(0)     
+        #sys.exit(0)     
 
 #-----------------------------------------------------------------------------------------------------------
 # START HERE
@@ -956,4 +978,3 @@ elif ssh_method=='passwordless':
     print "-- ⌨️ Custom | bash=" + ME_PATH +  " param1=-custom param2=remote terminal=false refresh=true" 
 
 print_refresh()
-
