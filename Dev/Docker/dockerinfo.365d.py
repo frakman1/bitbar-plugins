@@ -85,7 +85,9 @@ class c:
     END = '\033[0m'
     GREY = '\033[1;30m'
     UNDERLINE = '\033[4m'
-    
+
+ARROW = c.GREY+'╰➛'+c.END
+
 if os.path.isfile(local_path) :
     with open(local_path, 'r') as file:
         tmp = file.read()
@@ -240,7 +242,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         total = int(run_script(DOCKERPS_QUICK + ' | wc -l | xargs')) 
         down = total-up
         
-        print c.END,'{}'.format('╰➛📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END)),c.END
+        print c.END,'{}{}'.format(ARROW,'📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END)),c.END
         print '--',c.END,'{:<13s}'.format('  CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:>20s}'.format('SIZE                '),c.END," | size={} font='Courier New'".format(size)
     elif ssh=='passwordless':
         up = int(run_script(DOCKERPSUP_QUICK_SSH.replace('<ip>',ip).replace('<user>',user)  + ' | wc -l | xargs'))
@@ -248,7 +250,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         down = total-up
 
         
-        print c.END,'{}'.format('╰➛📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END)),c.END
+        print c.END,'{}{}'.format(ARROW,'📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END)),c.END
         print '--',c.END,'{:<12s}'.format('  CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," | size={} font='Courier New'".format(size)
     else: #pexpect (ssh+password)
         cmd_output = run_remote_cmd(DOCKERPS_QUICK + ' | wc -l | xargs', child)
@@ -256,7 +258,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             num = [int(s) for s in line.split() if s.isdigit()]
             if num:
                 break
-        print c.END+'{}'.format('╰➛📦 Containers {}'.format(c.GREEN +str(num)+c.END))+c.END
+        print c.END+'{}{}'.format(ARROW,'📦 Containers {}'.format(c.GREEN +str(num)+c.END))+c.END
         print '--',c.END,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," |  size={} font='Courier New'".format(size)
     for i, line in enumerate(input_mystring.splitlines()):
         if '--format' in line or '{{' in line :
@@ -429,9 +431,9 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
 def print_images(input_mystring, local=True, size=8, ssh='password'):
     global dockerps_images
     if local:
-        print c.END,'{}'.format('╰➛🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD + ' | wc -l') + ']' + c.END)),c.END
+        print c.END,'{}{}'.format(ARROW,'🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD + ' | wc -l') + ']' + c.END)),c.END
     elif ssh=='passwordless':
-        print c.END,'{}'.format('╰➛🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l') + ']' + c.END)),c.END
+        print c.END,'{}{}'.format(ARROW,'🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l') + ']' + c.END)),c.END
     else: #pexpect (ssh+password)
         num=''
         cmd_output = run_remote_cmd(DOCKERIMAGES_CMD + ' | wc -l', child)
@@ -439,7 +441,7 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
             num = [int(s) for s in line.split() if s.isdigit()]
             if num:
                 break
-        print c.END,'{}'.format('╰➛🖼️ Images ({})'.format(c.GREEN +str(num)+c.END)),c.END
+        print c.END,'{}{}'.format(ARROW,'🖼️ Images ({})'.format(c.GREEN +str(num)+c.END)),c.END
     print '-- ',c.END,'{:<45s}'.format('  REPOSITORY'),'{:<15s}'.format('  TAG'),'{:<15s}'.format('ID'),'{:<15s}'.format('CREATED'),'{:>10s}'.format('SIZE   '),c.END," |  size={} font='Courier New'".format(size)
     for i, line in enumerate(input_mystring.splitlines()):        
         if '--format' in line or '{{' in line :
@@ -795,7 +797,7 @@ if local_enabled:
     cmd_output = run_script(DOCKERIMAGES_CMD)
     print_images(cmd_output, local=True, size=10)
 
-    print c.END,'{}'.format('╰➛🐞 Debug'),c.END
+    print c.END,'{}{}'.format(ARROW,'🐞 Debug'),c.END
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Docker Info
     #-----------------------------------------------------------------------------------------------------------
@@ -946,7 +948,7 @@ if ssh_method=='password':
     cmd_output = run_remote_cmd(DOCKERIMAGES_CMD, child)
     print_images(cmd_output, local=False, size=10)
 
-    print c.END,'{}'.format('╰➛🐞 Debug'),c.END
+    print c.END,'{}{}'.format(ARROW,'🐞 Debug'),c.END
     #-----------------------------------------------------------------------------------------------------------
     # Get Remote Docker Info
     #-----------------------------------------------------------------------------------------------------------
@@ -985,7 +987,7 @@ elif ssh_method=='passwordless':
     cmd_output = run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user))
     print_images(cmd_output, local=False, size=10, ssh=ssh_method)
 
-    print c.END,'{}'.format('╰➛🐞 Debug'),c.END
+    print c.END,'{}{}'.format(ARROW,'🐞 Debug'),c.END
     #-----------------------------------------------------------------------------------------------------------
     # Get Remote Docker Info (but use the local processing)
     #-----------------------------------------------------------------------------------------------------------
