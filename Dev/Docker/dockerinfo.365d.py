@@ -44,7 +44,9 @@ os.environ["PATH"] += os.pathsep + '/usr/local/bin'
 DOCKER_PATH = 'docker'
 SSH = ' -H ssh://<user>@<ip>:22 '
 DOCKERPS_QUICK = DOCKER_PATH + " ps -a --format '{{.ID}}'"
+DOCKERPSUP_QUICK = DOCKER_PATH + " ps --format '{{.ID}}'"
 DOCKERPS_QUICK_SSH = DOCKER_PATH + SSH + " ps -a --format '{{.ID}}'"
+DOCKERPSUP_QUICK_SSH = DOCKER_PATH + SSH + " ps --format '{{.ID}}'"
 DOCKERPS_CMD_LOCAL = DOCKER_PATH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}^^{{.Size}}^^{{.Ports}}'"
 DOCKERPS_CMD_SSH = DOCKER_PATH + SSH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}^^{{.Ports}}'"
 DOCKERPS_CMD_REMOTE = DOCKER_PATH + " ps -a --format '{{.ID}}^^{{.Image}}^^{{.Command}}^^{{.Status}}^^{{.Names}}'"
@@ -75,13 +77,13 @@ class c:
     BLACK = '\033[30m' 
     RED = '\033[31m' 
     GREEN = '\033[32m'
-    YELLOW = '\033[33m'
+    YELLOW = '\033[1;33m'
     BLUE = '\033[34m'
     MAGENTA = '\033[35m'
     CYAN = '\033[36m'
     WHITE = '\033[0;37m'
     END = '\033[0m'
-    GREY = '\033[1m'
+    GREY = '\033[1;30m'
     UNDERLINE = '\033[4m'
     
 if os.path.isfile(local_path) :
@@ -234,10 +236,19 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
     global dockerps_images
     del dockerps_images[:]
     if local:
-        print c.END,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK + ' | wc -l | xargs') + ']' + c.END)),c.END
+        up = int(run_script(DOCKERPSUP_QUICK + ' | wc -l | xargs'))
+        total = int(run_script(DOCKERPS_QUICK + ' | wc -l | xargs')) 
+        down = total-up
+        
+        print c.END,'{}'.format('╰➛📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END)),c.END
         print '--',c.END,'{:<13s}'.format('  CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:>20s}'.format('SIZE                '),c.END," | size={} font='Courier New'".format(size)
     elif ssh=='passwordless':
-        print c.END,'{}'.format('    📦 Containers {}'.format(c.GREEN + '[' + run_script(DOCKERPS_QUICK_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l | xargs') + ']' + c.END)),c.END        
+        up = int(run_script(DOCKERPSUP_QUICK_SSH.replace('<ip>',ip).replace('<user>',user)  + ' | wc -l | xargs'))
+        total = int(run_script(DOCKERPS_QUICK_SSH.replace('<ip>',ip).replace('<user>',user)  + ' | wc -l | xargs')) 
+        down = total-up
+
+        
+        print c.END,'{}'.format('╰➛📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END)),c.END
         print '--',c.END,'{:<12s}'.format('  CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," | size={} font='Courier New'".format(size)
     else: #pexpect (ssh+password)
         cmd_output = run_remote_cmd(DOCKERPS_QUICK + ' | wc -l | xargs', child)
@@ -245,7 +256,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             num = [int(s) for s in line.split() if s.isdigit()]
             if num:
                 break
-        print c.END+'{}'.format('    📦 Containers {}'.format(c.GREEN +str(num)+c.END))+c.END
+        print c.END+'{}'.format('╰➛📦 Containers {}'.format(c.GREEN +str(num)+c.END))+c.END
         print '--',c.END,'{:<12s}'.format('CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," |  size={} font='Courier New'".format(size)
     for i, line in enumerate(input_mystring.splitlines()):
         if '--format' in line or '{{' in line :
@@ -264,14 +275,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         else:
             mystring = '--'+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
             display(mystring)
-        if split_line[1] not in dockerps_images:
-            if ':' not in split_line[1]:
-                toadd = (split_line[1]+':latest')
-            else:
-                toadd = (split_line[1])
-            if toadd not in dockerps_images:
-                dockerps_images.append(toadd)
-                
+                   
         #-----------------------------------------------------------------------------------------------------------
         # INSPECT 
         #-----------------------------------------------------------------------------------------------------------
@@ -288,11 +292,30 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         for inspect_line in inspect_output.splitlines():
             mystring = "------ " + repr(inspect_line) + " | size=11 font='Courier New'"
             display(mystring)
+            
+            # Compile used images list
+            if 'Image": "sha256:' in inspect_line:
+                imageid = inspect_line.split("sha256:")[1][:12]
+                
+                if not any(imageid in d for d in dockerps_images):
+                    #print "imageid NOT in dockerps_images"
+                    container_list = []
+                    container_list.append(split_line[4])
+                    dict_entry = {imageid:container_list}
+                    #print"dict_entry:",dict_entry
+                    dockerps_images.append(dict_entry)
+                    #print"dockerps_images:",dockerps_images
+                else:
+                    #print "imageid IS in dockerps_images"
+                    for mydict in dockerps_images: 
+                        for key in mydict:
+                            if key == imageid: 
+                                mydict[key].append(split_line[4])
+                                break
 
         #-----------------------------------------------------------------------------------------------------------
         # LOG 
         #-----------------------------------------------------------------------------------------------------------
-            
         if local or ssh=='passwordless':
             if ssh=='passwordless': 
                 log_cmd = DOCKER_LOGS_SSH.replace('<user>',user).replace('<ip>',ip) + split_line[0].strip()  + " 2>&1"
@@ -400,14 +423,15 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             print "------ ID   |  bash=" + ME_PATH +  " param1=-copyid   param2={} param3=null param4=null terminal=false refresh=false".format(split_line[0])
             print "------ Name |  bash=" + ME_PATH +  " param1=-copyname param2={} param3=null param4=null terminal=false refresh=false".format(split_line[4])
             print "------ Line |  bash=" + ME_PATH +  " param1=-copyline param2={} param3=null param4=null terminal=false refresh=false".format(line[:line.rindex('^^')].replace('"','').replace(' ','_sp_'))
-
+        #print "dockerps_images:",dockerps_images
+    #exit()
 @timing_decorator          
 def print_images(input_mystring, local=True, size=8, ssh='password'):
     global dockerps_images
     if local:
-        print c.END,'{}'.format('    🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD + ' | wc -l') + ']' + c.END)),c.END
+        print c.END,'{}'.format('╰➛🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD + ' | wc -l') + ']' + c.END)),c.END
     elif ssh=='passwordless':
-        print c.END,'{}'.format('    🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l') + ']' + c.END)),c.END
+        print c.END,'{}'.format('╰➛🖼️ Images {}'.format(c.GREEN + '[' + run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user) + ' | wc -l') + ']' + c.END)),c.END
     else: #pexpect (ssh+password)
         num=''
         cmd_output = run_remote_cmd(DOCKERIMAGES_CMD + ' | wc -l', child)
@@ -415,7 +439,7 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
             num = [int(s) for s in line.split() if s.isdigit()]
             if num:
                 break
-        print c.END,'{}'.format('    🖼️ Images ({})'.format(c.GREEN +str(num)+c.END)),c.END
+        print c.END,'{}'.format('╰➛🖼️ Images ({})'.format(c.GREEN +str(num)+c.END)),c.END
     print '-- ',c.END,'{:<45s}'.format('  REPOSITORY'),'{:<15s}'.format('  TAG'),'{:<15s}'.format('ID'),'{:<15s}'.format('CREATED'),'{:>10s}'.format('SIZE   '),c.END," |  size={} font='Courier New'".format(size)
     for i, line in enumerate(input_mystring.splitlines()):        
         if '--format' in line or '{{' in line :
@@ -425,11 +449,20 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
             continue
         mystring = '-- '+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:>10s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
         display(mystring)
+        
         if local or ssh=='passwordless':
-            if (split_line[0]+':'+split_line[1]) not in dockerps_images:    # if this image is not used by a container
-                print "---- 🗑️ Remove | bash=" + ME_PATH +  " param1=-rmi param2={} param3={} param4={} terminal=false refresh=true".format(split_line[2],local,split_line[0])
-            else:
+            #check if image is in use by a container. If so, list those containers
+            if any(split_line[2] in d for d in dockerps_images):    
+                print "---- 🏗️ Image Used in "
+                for mydict in dockerps_images: 
+                    for key in mydict:
+                        if key == split_line[2]: 
+                            for line in mydict[key]:
+                                print "------📦 " + str(line)
+                            break
                 print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmif param2={} param3={} param4={} terminal=false refresh=true".format(split_line[2],local,split_line[0])
+            else:
+                print "---- 🗑️ Remove | bash=" + ME_PATH +  " param1=-rmi param2={} param3={} param4={} terminal=false refresh=true".format(split_line[2],local,split_line[0])
 
 @timing_decorator    
 def print_info(input_mystring, local=True, size=11):
@@ -762,8 +795,7 @@ if local_enabled:
     cmd_output = run_script(DOCKERIMAGES_CMD)
     print_images(cmd_output, local=True, size=10)
 
-    print c.END,'{}'.format('    🐞 Debug'),c.END
-    
+    print c.END,'{}'.format('╰➛🐞 Debug'),c.END
     #-----------------------------------------------------------------------------------------------------------
     # Get Local Docker Info
     #-----------------------------------------------------------------------------------------------------------
@@ -914,7 +946,7 @@ if ssh_method=='password':
     cmd_output = run_remote_cmd(DOCKERIMAGES_CMD, child)
     print_images(cmd_output, local=False, size=10)
 
-    print c.END,'{}'.format('    🐞 Debug'),c.END
+    print c.END,'{}'.format('╰➛🐞 Debug'),c.END
     #-----------------------------------------------------------------------------------------------------------
     # Get Remote Docker Info
     #-----------------------------------------------------------------------------------------------------------
@@ -953,7 +985,7 @@ elif ssh_method=='passwordless':
     cmd_output = run_script(DOCKERIMAGES_CMD_SSH.replace('<ip>',ip).replace('<user>',user))
     print_images(cmd_output, local=False, size=10, ssh=ssh_method)
 
-    print c.END,'{}'.format('    🐞 Debug'),c.END
+    print c.END,'{}'.format('╰➛🐞 Debug'),c.END
     #-----------------------------------------------------------------------------------------------------------
     # Get Remote Docker Info (but use the local processing)
     #-----------------------------------------------------------------------------------------------------------
