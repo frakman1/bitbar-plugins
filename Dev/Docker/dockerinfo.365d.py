@@ -268,14 +268,14 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             continue
         if local or ssh=='passwordless':
             if ssh=='passwordless':
-                mystring = '--'+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.END+c.YELLOW+'{:<31s}'.format(split_line[1])+c.END+c.RED+'{:<22s}'.format(split_line[2])+c.END+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.END+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+                mystring = '--'+c.GREY+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.END+c.YELLOW+'{:<31s}'.format(split_line[1])+c.END+c.RED+'{:<22s}'.format(split_line[2])+c.END+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.END+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
                 
             else:
-                mystring = '--'+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<20s}'.format(split_line[4])+c.CYAN+'{:>20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
+                mystring = '--'+c.GREY+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:<20s}'.format(split_line[4])+c.CYAN+'{:>20s}'.format(split_line[5])+c.END+" | size={} font='Courier New'".format(size)
             display(mystring)
 
         else:
-            mystring = '--'+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+            mystring = '--'+c.GREY+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<13s}'.format(split_line[0])+c.YELLOW+'{:<31s}'.format(split_line[1])+c.RED+'{:<22s}'.format(split_line[2])+c.MAGENTA+'{:<28s}'.format(split_line[3])+c.GREEN+'{:>20s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
             display(mystring)
                    
         #-----------------------------------------------------------------------------------------------------------
@@ -449,7 +449,7 @@ def print_images(input_mystring, local=True, size=8, ssh='password'):
         split_line = line.split("^^")
         if len(split_line) < 5:
             continue
-        mystring = '-- '+c.BLACK+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:>10s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
+        mystring = '-- '+c.GREY+str(i+1).zfill(2)+' '+c.END+c.BLUE+'{:<45s}'.format(split_line[0])+c.RED+'{:<15s}'.format(split_line[1])+c.YELLOW+'{:<15s}'.format(split_line[2])+c.MAGENTA+'{:<15s}'.format(split_line[3])+c.GREEN+'{:>10s}'.format(split_line[4])+c.END+" | size={} font='Courier New'".format(size)
         display(mystring)
         
         if local or ssh=='passwordless':
@@ -765,15 +765,16 @@ if(len(sys.argv) >= 2):
         sys.exit(0)
 
     elif(sys.argv[1] == '-follow'):
-        print 'sys.argv[2]:',sys.argv[2]
+        #print 'sys.argv[2]:',sys.argv[2]
         if ssh_method=='passwordless' and sys.argv[3]=='False':
             cmd = DOCKER_PATH + ssh_addon + " logs -t --follow " + sys.argv[2] 
         else:
             cmd = DOCKER_PATH + " logs -t --follow " + sys.argv[2] 
-        print cmd
+        #print cmd
         os.system('echo "Running: {}";{}'.format(cmd,cmd))
-        #sys.exit(0)     
+        sys.exit(0)     
 
+    #sys.exit(0)
 #-----------------------------------------------------------------------------------------------------------
 # START HERE
 #-----------------------------------------------------------------------------------------------------------
