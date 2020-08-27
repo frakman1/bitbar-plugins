@@ -136,7 +136,7 @@ def write_to_clipboard(output):
             
 def display(msg):
     sys.stdout.flush()
-    print(msg)
+    print(msg.strip())
     sys.stdout.flush()
 
 def test_call(*args, **kwargs):
@@ -242,16 +242,16 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         total = int(run_script(DOCKERPS_QUICK + ' | wc -l | xargs')) 
         down = total-up
         
-        print c.END,'{}{}'.format(ARROW,'📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END)),c.END
-        print '--',c.END,'{:<13s}'.format('  CONTAINER ID'),'{:<25s}'.format('IMAGE'),'{:<22s}'.format('COMMAND'),'{:<28s}'.format('STATUS'),'{:<21s}'.format('NAME'),'{:>20s}'.format('SIZE                '),c.END," | size={} font='Courier New'".format(size)
+        display(c.END+'{}{}'.format(ARROW,'📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END))+c.END)
+        display('--'+c.END+'{:<13s}'.format('  CONTAINER ID')+'{:<25s}'.format('IMAGE')+'{:<22s}'.format('COMMAND')+'{:<28s}'.format('STATUS')+'{:<21s}'.format('NAME')+'{:>20s}'.format('SIZE                ')+c.END+" | size={} font='Courier New'".format(size))
     elif ssh=='passwordless':
         up = int(run_script(DOCKERPSUP_QUICK_SSH.replace('<ip>',ip).replace('<user>',user)  + ' | wc -l | xargs'))
         total = int(run_script(DOCKERPS_QUICK_SSH.replace('<ip>',ip).replace('<user>',user)  + ' | wc -l | xargs')) 
         down = total-up
 
         
-        print c.END,'{}{}'.format(ARROW,'📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END)),c.END
-        print '--',c.END,'{:<12s}'.format('  CONTAINER ID'),'{:<31s}'.format(' IMAGE'),'{:<22s}'.format('  COMMAND'),'{:<28s}'.format('   STATUS'),'{:>20s}'.format('NAME           '),c.END," | size={} font='Courier New'".format(size)
+        display(c.END+'{}{}'.format(ARROW,'📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END))+c.END)
+        display('--'+c.END+'{:<12s}'.format('  CONTAINER ID')+'{:<31s}'.format(' IMAGE')+'{:<22s}'.format('  COMMAND')+'{:<28s}'.format('   STATUS')+'{:>20s}'.format('NAME           ')+c.END+" | size={} font='Courier New'".format(size))
     else: #pexpect (ssh+password)
         cmd_output = run_remote_cmd(DOCKERPS_QUICK + ' | wc -l | xargs', child)
         for line in cmd_output.splitlines():
@@ -292,7 +292,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             inspect_output = run_remote_cmd(inspect_cmd, sess)
         print "---- 🔬 Inspect"
         for inspect_line in inspect_output.splitlines():
-            mystring = "------ " + repr(inspect_line) + " | size=11 font='Courier New'"
+            mystring = "------ " + c.END + (inspect_line) + " | size=11 font='Courier New'"
             display(mystring)
             
             # Compile used images list
@@ -329,8 +329,8 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
             log_output = run_remote_cmd(log_cmd, sess)
         
         #print "---- 🪵 Log"
-        print "---- 📔 Log"
-        print "------  👣 Follow Log | color = green bash=" + ME_PATH +  " param1=-follow param2={} param3={} param4=null terminal=true refresh=false".format(split_line[0],local)
+        display("---- 📔 Log")
+        display("------  👣 Follow Log | color = green bash=" + ME_PATH +  " param1=-follow param2={} param3={} param4=null terminal=true refresh=false".format(split_line[0],local))
         
         #print "---- Log| image={}".format(log_icon2)
         for log_line in log_output.splitlines():
@@ -339,13 +339,13 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         
         
         if local or ssh=='passwordless':
-            print "---- 🔄 Restart | bash=" + ME_PATH +  " param1=-restart param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
+            display( "---- 🔄 Restart | bash=" + ME_PATH +  " param1=-restart param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4]))
             if 'Up' in split_line[3]:
-                print "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-stop param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
-                print "---- ↩️ Enter | none"+c.END
-                print "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-bash param2={} param3={} terminal=true refresh=false".format(split_line[0],local)
-                print "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-shell param2={} param3={} terminal=true refresh=false".format(split_line[0],local)
-                print "------ 🌐 web " 
+                display( "---- 🛑 Stop | bash=" + ME_PATH +  " param1=-stop param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4]))
+                display( "---- ↩️ Enter | none"+c.END)
+                display( "------ #️⃣ bash | bash="+ ME_PATH +  " param1=-bash param2={} param3={} terminal=true refresh=false".format(split_line[0],local))
+                display( "------ 🐚 sh   |  bash=" + ME_PATH +  " param1=-shell param2={} param3={} terminal=true refresh=false".format(split_line[0],local))
+                display( "------ 🌐 web " )
                 
                 #sometimes, the Ports list is not populated so you have to look into the 'inspect' data to sniff out some ports.
                 exports=[]
@@ -403,28 +403,29 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
                                 
                         if local:
                             if web_error:
-                                print "-------- ❗http://" + "127.0.0.1" + ":" + p + " | href=http://{}:{}".format('127.0.0.1',p)
+                                display( "-------- ❗http://" + "127.0.0.1" + ":" + p + " | href=http://{}:{}".format('127.0.0.1',p))
                             else:
-                                print "-------- http://" + "127.0.0.1" + ":" + p + " | href=http://{}:{}".format('127.0.0.1',p)
+                                display( "-------- http://" + "127.0.0.1" + ":" + p + " | href=http://{}:{}".format('127.0.0.1',p))
                         else:
                             if web_error:
-                                print "-------- ❗http://" + ip + ":" + p + " | href=http://{}:{}".format(ip,p)
+                                display( "-------- ❗http://" + ip + ":" + p + " | href=http://{}:{}".format(ip,p))
                             else:
-                                print "-------- http://" + ip + ":" + p + " | href=http://{}:{}".format(ip,p)
+                                display( "-------- http://" + ip + ":" + p + " | href=http://{}:{}".format(ip,p))
                     except Exception as e:
                         #print "Error parsing portlist: {}".format(e)
                         pass                        
                 
-                print "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
+                display( "---- 🔨 Force Remove | bash=" + ME_PATH +  " param1=-rmf param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4]))
         
             #if 'Exited' in split_line[3] or 'Created' in split_line[3]:
             else:
-                print "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-start param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
-                print "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-remove param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4])
-            print "---- 📋 Copy "
-            print "------ ID   |  bash=" + ME_PATH +  " param1=-copyid   param2={} param3=null param4=null terminal=false refresh=false".format(split_line[0])
-            print "------ Name |  bash=" + ME_PATH +  " param1=-copyname param2={} param3=null param4=null terminal=false refresh=false".format(split_line[4])
-            print "------ Line |  bash=" + ME_PATH +  " param1=-copyline param2={} param3=null param4=null terminal=false refresh=false".format(line[:line.rindex('^^')].replace('"','').replace(' ','_sp_'))
+                display( "---- ▶️ Start  |  bash=" + ME_PATH +  " param1=-start param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4]))
+                display( "---- 🗑️ Remove |  bash=" + ME_PATH +  " param1=-remove param2={} param3={} param4={} terminal=false refresh=true".format(split_line[0],local,split_line[4]))
+            display("---- 📋 Copy ")
+            display("------ ID    |  bash=" + ME_PATH +  " param1=-copyid   param2={} param3=null param4=null terminal=false refresh=false".format(split_line[0]))
+            display("------ Image |  bash=" + ME_PATH +  " param1=-copyimg param2={} param3=null param4=null terminal=false refresh=false".format(split_line[1]))
+            display("------ Name  |  bash=" + ME_PATH +  " param1=-copyname param2={} param3=null param4=null terminal=false refresh=false".format(split_line[4]))
+            #print "------ Line |  bash=" + ME_PATH +  " param1=-copyline param2={} param3=null param4=null terminal=false refresh=false".format(line[:line.rindex('^^')].replace('"','').replace(' ','_sp_'))
         #print "dockerps_images:",dockerps_images
     #exit()
 @timing_decorator          
@@ -516,7 +517,7 @@ def print_refresh():
     print "---"
     print "🔄 Refresh | refresh=true"
     end = time.time()
-    print(''.join(["Elapsed Time: ",str(end - start).split('.')[0]]))    
+    print(''.join(["⏱️Elapsed Time: ",str(end - start).split('.')[0]]))    
     print "---"                   
     sys.exit(0)
     
@@ -533,7 +534,7 @@ parser.add_argument('-bash', action='store', dest='lbash',help='Bash Into A Runn
 parser.add_argument('-shell', action='store', dest='lsh',help='Sh Into A Running Container')
 parser.add_argument('-copyid', action='store', dest='lcpid',help='Copy Container ID to Clipboard')
 parser.add_argument('-copyname', action='store', dest='lcpname',help='Copy Container Name to Clipboard')
-parser.add_argument('-copyline', action='store', dest='lcpline',help='Copy Container Line to Clipboard')
+parser.add_argument('-copyimg', action='store', dest='lcpimg',help='Copy Container Image to Clipboard')
 parser.add_argument('-rmi', action='store', dest='lremoveimage',help='Remove An Image')
 parser.add_argument('-rmif', action='store', dest='lforceremoveimage',help='Force Remove An Image')
 parser.add_argument('-local', action='store', dest='llocal',help='Toggle Local Server Support')
@@ -633,14 +634,15 @@ if(len(sys.argv) >= 2):
 
     elif(sys.argv[1] =='-copyid'):
         write_to_clipboard(sys.argv[2])
-        #sys.exit(0) 
+        sys.exit(0) 
     elif(sys.argv[1] =='-copyname'):
         write_to_clipboard(sys.argv[2])
-        #sys.exit(0) 
-    elif(sys.argv[1] =='-copyline'):
+        sys.exit(0) 
+    elif(sys.argv[1] =='-copyimg'):
+        write_to_clipboard(sys.argv[2])
         #OSXApp().inform("Result", "Script returned:\n\n{}".format(zstring))
-        write_to_clipboard((sys.argv[2]).replace('^^',"  ").replace('_sp_'," "))
-        #sys.exit(0) 
+        #write_to_clipboard((sys.argv[2]).replace('^^',"  ").replace('_sp_'," "))
+        sys.exit(0) 
         
     elif(sys.argv[1] == '-rmi'):   
         if ssh_method=='passwordless' and sys.argv[3]=='False':
