@@ -243,7 +243,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
         down = total-up
         
         display(c.END+'{}{}'.format(ARROW,'📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END))+c.END)
-        display('--'+c.END+'{:<13s}'.format('  CONTAINER ID')+'{:<25s}'.format('IMAGE')+'{:<22s}'.format('COMMAND')+'{:<28s}'.format('STATUS')+'{:<21s}'.format('NAME')+'{:>20s}'.format('SIZE                ')+c.END+" | size={} font='Courier New'".format(size))
+        display('--'+c.END+'{:<13s}'.format('  CONTAINER-ID')+'{:<25s}'.format('  IMAGE')+'{:<22s}'.format('        COMMAND')+'{:<28s}'.format('        STATUS')+'{:<21s}'.format('        NAME')+'{:>20s}'.format('SIZE        ')+c.END+" | size={} font='Courier New'".format(size))
     elif ssh=='passwordless':
         up = int(run_script(DOCKERPSUP_QUICK_SSH.replace('<ip>',ip).replace('<user>',user)  + ' | wc -l | xargs'))
         total = int(run_script(DOCKERPS_QUICK_SSH.replace('<ip>',ip).replace('<user>',user)  + ' | wc -l | xargs')) 
@@ -251,7 +251,7 @@ def print_containers(input_mystring, local=True, size=8, sess=None, ssh='passwor
 
         
         display(c.END+'{}{}'.format(ARROW,'📦 Containers{} {} {}'.format(c.YELLOW + '[' + str(total) + ']' + c.END ,c.GREEN + str(up) + '⇧'  + c.END,c.RED  + str(down) + '⇩' + c.END))+c.END)
-        display('--'+c.END+'{:<12s}'.format('  CONTAINER ID')+'{:<31s}'.format(' IMAGE')+'{:<22s}'.format('  COMMAND')+'{:<28s}'.format('   STATUS')+'{:>20s}'.format('NAME           ')+c.END+" | size={} font='Courier New'".format(size))
+        display('--'+c.END+'{:<13s}'.format('  CONTAINER-ID')+'{:<31s}'.format(' IMAGE')+'{:<22s}'.format('  COMMAND')+'{:<28s}'.format('   STATUS')+'{:>20s}'.format('NAME           ')+c.END+" | size={} font='Courier New'".format(size))
     else: #pexpect (ssh+password)
         cmd_output = run_remote_cmd(DOCKERPS_QUICK + ' | wc -l | xargs', child)
         for line in cmd_output.splitlines():
